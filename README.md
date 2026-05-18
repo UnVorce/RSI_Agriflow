@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AgriFlow Backend
 
 Fertilizer Subsidy Distribution Management System - Backend API
@@ -223,3 +224,6 @@ Logs are stored in the `logs/` directory:
 ## License
 
 ISC
+=======
+# RSI_Agriflow_Backend
+>>>>>>> 617b7b691aa408baf10e5a432ca13450868fc873
