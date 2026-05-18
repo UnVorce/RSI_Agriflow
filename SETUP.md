@@ -14,9 +14,9 @@ docker-compose up -d
 
 Wait about 30 seconds for SQL Server to fully initialize.
 
-## Step 2: Create Database Schemas
+## Step 2: Create Database
 
-SQL Server doesn't automatically create schemas, so we need to create them manually.
+Create the `AgriFlowDB` database before running Prisma migrations.
 
 ### Option A: Using SQL Server Management Studio (SSMS)
 
@@ -30,43 +30,27 @@ CREATE DATABASE AgriFlowDB;
 GO
 ```
 
-3. Create the schemas:
-```sql
-USE AgriFlowDB;
-GO
-
-CREATE SCHEMA ref;
-CREATE SCHEMA master;
-CREATE SCHEMA trans;
-CREATE SCHEMA evt;
-GO
-```
-
 ### Option B: Using sqlcmd (Command Line)
 
 ```bash
 docker exec -it agriflow-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P AgriFlow2024! -C -Q "CREATE DATABASE AgriFlowDB;"
-
-docker exec -it agriflow-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P AgriFlow2024! -d AgriFlowDB -C -Q "CREATE SCHEMA ref; CREATE SCHEMA master; CREATE SCHEMA trans; CREATE SCHEMA evt;"
 ```
 
 ## Step 3: Run Prisma Migrations
 
-Generate Prisma client and create tables:
+Generate Prisma client and apply the committed migration history:
 
 ```bash
 npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:deploy
 ```
-
-When prompted for migration name, enter: `init`
 
 ## Step 4: Seed Initial Data
 
 Populate the database with initial roles, fertilizer types, and a test government user:
 
 ```bash
-npx tsx prisma/seed.ts
+npm run prisma:seed
 ```
 
 This will create:
@@ -138,7 +122,7 @@ docker logs agriflow-redis
 
 If migrations fail:
 
-1. Ensure schemas are created in SQL Server
+1. Ensure `AgriFlowDB` already exists
 2. Check DATABASE_URL in `.env` file
 3. Try resetting the database:
 ```bash

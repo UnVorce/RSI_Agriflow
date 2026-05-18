@@ -14,14 +14,15 @@ export const authenticate = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        error: 'Token tidak ditemukan' 
+      res.status(401).json({
+        error: 'Token tidak ditemukan'
       });
+      return;
     }
 
     const token = authHeader.substring(7);
@@ -29,9 +30,10 @@ export const authenticate = async (
     // Check if token is blacklisted
     const isBlacklisted = await redisClient.get(`blacklist:${token}`);
     if (isBlacklisted) {
-      return res.status(401).json({ 
-        error: 'Token tidak valid' 
+      res.status(401).json({
+        error: 'Token tidak valid'
       });
+      return;
     }
 
     const payload = verifyAccessToken(token);
@@ -39,8 +41,9 @@ export const authenticate = async (
 
     next();
   } catch (error) {
-    return res.status(401).json({ 
-      error: 'Token tidak valid atau sudah kadaluarsa' 
+    res.status(401).json({
+      error: 'Token tidak valid atau sudah kadaluarsa'
     });
+    return;
   }
 };

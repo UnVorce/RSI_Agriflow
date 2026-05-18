@@ -34,6 +34,7 @@ model KodePos {
   Petani Petani[]
 
   @@map("KODE_POS")
+  @@unique([KelurahanDesa, Kecamatan, KabupatenKota, Provinsi])
   @@schema("ref")
 }
 
@@ -133,7 +134,7 @@ model KuotaPetani {
 // ============================================
 
 model Stok {
-  UserId    String   @db.VarChar(255)
+  UserId    String   @db.NVarChar(1000)
   PupukId   Int
   Jumlah    Decimal  @db.Decimal(10, 2)
   Timestamp DateTime @default(now())

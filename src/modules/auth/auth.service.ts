@@ -1,8 +1,9 @@
 import prisma from '../../config/database';
 import { hashPassword, comparePassword } from '../../utils/password';
-import { generateAccessToken, generateRefreshToken } from '../../utils/jwt';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../../utils/jwt';
 import { AppError } from '../../common/middleware/error.middleware';
 import logger from '../../utils/logger';
+import redisClient from '../../config/redis';
 
 export class AuthService {
   async register(data: {
@@ -270,5 +271,69 @@ export class AuthService {
     logger.info(`User rejected: ${user.Email} by ${approverId}`);
 
     return updatedUser;
+  }
+
+  async logout(token: string, userId: string) {
+    try {
+      // Add token to blacklist (8 hours = 28800 seconds)
+      await redisClient.setEx(`blacklist:${token}`, 28800, 'true');
+
+      // Log activity
+      await prisma.logAktivitas.create({
+        data: {
+          Aksi: 'LOGOUT',
+          Deskripsi: 'Pengguna logout',
+          UserId: userId,
+        },
+      });
+
+      logger.info(`User logged out: ${userId}`);
+
+      return { message: 'Logout berhasil' };
+    } catch (error) {
+      logger.error('Logout error:', error);
+      throw new AppError('Gagal logout', 500);
+    }
+  }
+
+  async refreshToken(refreshToken: string) {
+    try {
+      // Verify refresh token
+      const payload = verifyRefreshToken(refreshToken);
+
+      // Check if user still exists and is active
+      const user = await prisma.user.findUnique({
+        where: { UserId: payload.userId },
+        include: { Role: true },
+      });
+
+      if (!user) {
+        throw new AppError('Pengguna tidak ditemukan', 404);
+      }
+
+      if (user.Status !== 'Active') {
+        throw new AppError('Akun tidak aktif', 403);
+      }
+
+      // Generate new access token
+      const newPayload = {
+        userId: user.UserId,
+        email: user.Email,
+        role: user.Role.RoleName,
+      };
+
+      const newAccessToken = generateAccessToken(newPayload);
+
+      logger.info(`Token refreshed for user: ${user.Email}`);
+
+      return {
+        accessToken: newAccessToken,
+      };
+    } catch (error: any) {
+      if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+        throw new AppError('Refresh token tidak valid atau sudah kadaluarsa', 401);
+      }
+      throw error;
+    }
   }
 }

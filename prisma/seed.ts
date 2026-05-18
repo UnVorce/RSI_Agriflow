@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -59,15 +60,18 @@ async function main() {
   ];
 
   for (const postal of postalCodes) {
-    await prisma.kodePos.create({
-      data: postal,
+    await prisma.kodePos.upsert({
+      where: {
+        KelurahanDesa_Kecamatan_KabupatenKota_Provinsi: postal,
+      },
+      update: {},
+      create: postal,
     });
   }
   console.log('✅ Postal codes seeded');
 
   // Create a government user for testing
   console.log('📝 Creating sample government user...');
-  const bcrypt = require('bcrypt');
   const hashedPassword = await bcrypt.hash('password123', 10);
 
   const govRole = await prisma.role.findUnique({
@@ -77,7 +81,13 @@ async function main() {
   if (govRole) {
     await prisma.user.upsert({
       where: { Email: 'government@agriflow.com' },
-      update: {},
+      update: {
+        FirstName: 'Admin',
+        LastName: 'Pemerintah',
+        HashedPassword: hashedPassword,
+        Status: 'Active',
+        RoleId: govRole.RoleId,
+      },
       create: {
         FirstName: 'Admin',
         LastName: 'Pemerintah',

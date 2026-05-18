@@ -5,6 +5,7 @@ import { authenticate } from '../../common/middleware/auth.middleware';
 import { requireRole } from '../../common/middleware/role.middleware';
 import { validate } from '../../common/validators/validate';
 import { registerSchema, loginSchema } from '../../common/validators/auth.validator';
+import { authRateLimiter } from '../../common/middleware/rate-limit.middleware';
 
 const router = Router();
 const authController = new AuthController();
@@ -41,7 +42,12 @@ const authController = new AuthController();
  *                 type: string
  *                 format: binary
  */
-router.post('/register', upload.single('proof'), authController.register);
+router.post(
+  '/register',
+  upload.single('proof'),
+  validate(registerSchema),
+  authController.register
+);
 
 /**
  * @swagger
@@ -50,7 +56,7 @@ router.post('/register', upload.single('proof'), authController.register);
  *     summary: Login user
  *     tags: [Auth]
  */
-router.post('/login', validate(loginSchema), authController.login);
+router.post('/login', authRateLimiter, validate(loginSchema), authController.login);
 
 /**
  * @swagger
@@ -99,5 +105,36 @@ router.patch(
   requireRole('PEMERINTAH'),
   authController.rejectUser
 );
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout user (blacklist token)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/logout', authenticate, authController.logout);
+
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ */
+router.post('/refresh', authController.refreshToken);
 
 export default router;

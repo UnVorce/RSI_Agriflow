@@ -10,9 +10,10 @@ npm start                      # Start production server
 
 # Database
 npm run prisma:generate        # Generate Prisma client
-npm run prisma:migrate         # Run migrations
+npm run prisma:migrate         # Create/apply dev migrations
+npm run prisma:deploy          # Apply committed migrations
 npm run prisma:studio          # Open Prisma Studio GUI
-npx tsx prisma/seed.ts         # Seed database
+npm run prisma:seed            # Seed database
 
 # Testing
 npm test                       # Run tests once
@@ -80,6 +81,8 @@ Database: AgriFlowDB
 ```bash
 POST   /api/auth/register      # Register (multipart/form-data)
 POST   /api/auth/login         # Login
+POST   /api/auth/logout        # Logout (blacklist token)
+POST   /api/auth/refresh       # Refresh access token
 GET    /api/auth/pending       # Get pending users (Gov)
 PATCH  /api/auth/approve/:id   # Approve user (Gov)
 PATCH  /api/auth/reject/:id    # Reject user (Gov)
@@ -105,6 +108,34 @@ POST   /api/shipments/receive  # Receive shipment (Ret)
 POST   /api/redemption/validate  # Validate farmer (Ret)
 POST   /api/redemption           # Redeem fertilizer (Ret)
 GET    /api/redemption/history   # Get history (Ret)
+```
+
+### Monitoring (Government Only)
+```bash
+GET    /api/monitoring                    # Get monitoring data
+GET    /api/monitoring/anomaly            # Basic anomaly detection
+GET    /api/monitoring/advanced-anomaly   # ML-based anomaly detection
+GET    /api/monitoring/forecast           # Demand forecasting
+GET    /api/monitoring/correlations       # Province-fertilizer correlation
+GET    /api/monitoring/performance        # Performance metrics
+GET    /api/monitoring/provinces          # Get provinces list
+GET    /api/monitoring/trends             # Distribution trends
+```
+
+### Dashboard
+```bash
+GET    /api/dashboard            # Role-specific dashboard
+```
+
+### Notifications
+```bash
+GET    /api/notifications                 # Get notifications
+GET    /api/notifications/unread-count    # Get unread count
+PATCH  /api/notifications/:id/read        # Mark as read
+PATCH  /api/notifications/mark-all-read   # Mark all as read
+DELETE /api/notifications/:id             # Delete notification
+POST   /api/notifications/complaints      # Submit complaint
+GET    /api/notifications/complaints      # Get complaints (Gov)
 ```
 
 ## 🧪 Sample API Calls
@@ -148,6 +179,31 @@ curl -X POST http://localhost:3000/api/redemption/validate \
   -d '{"petaniId":"1234567890123456"}'
 ```
 
+### Logout
+```bash
+curl -X POST http://localhost:3000/api/auth/logout \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Refresh Token
+```bash
+curl -X POST http://localhost:3000/api/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"YOUR_REFRESH_TOKEN"}'
+```
+
+### Advanced Anomaly Detection
+```bash
+curl http://localhost:3000/api/monitoring/advanced-anomaly?days=30 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Demand Forecast
+```bash
+curl http://localhost:3000/api/monitoring/forecast?months=3 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
 ## 🥬 Fertilizer Types (Seeded)
 
 1. Urea
@@ -187,6 +243,7 @@ curl -X POST http://localhost:3000/api/redemption/validate \
 |-------|---------|
 | Token tidak ditemukan | No Authorization header |
 | Token tidak valid | Invalid/expired token |
+| Terlalu banyak permintaan | Rate limit exceeded |
 | Email sudah terdaftar | Email already exists |
 | Akun masih menunggu persetujuan | User status is Pending |
 | Akun telah ditolak | User status is Rejected |
@@ -194,6 +251,14 @@ curl -X POST http://localhost:3000/api/redemption/validate \
 | Kuota petani tidak mencukupi | Farmer quota exceeded |
 | ID Petani harus 16 digit | Invalid farmer ID format |
 | Petani bukan milik pengecer ini | Farmer doesn't belong to retailer |
+
+## 🎯 Rate Limits
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| All API endpoints | 60 requests | 1 minute |
+| Login | 5 attempts | 15 minutes |
+| Strict endpoints | 10 requests | 1 minute |
 
 ## 🔍 Debugging Tips
 
@@ -288,6 +353,28 @@ MAX_FILE_SIZE=5242880
 - [x] Token blacklisting
 - [x] Audit logging
 - [x] Private file storage
+- [x] Rate limiting
+- [x] Redis caching
+
+## 📈 Phase 3 Features
+
+### ML-Based Anomaly Detection
+- Z-Score method (threshold: |Z| > 3)
+- IQR (Interquartile Range) method
+- Pattern-based detection
+- Confidence scoring (0-1)
+
+### Time Series Forecasting
+- Simple Moving Average (SMA)
+- Trend analysis
+- 3-month forecast window
+- Historical pattern analysis
+
+### Analytics
+- Province-fertilizer correlation
+- Performance metrics
+- Optimization recommendations
+- Distribution efficiency tracking
 
 ## 📚 Documentation Files
 
@@ -297,6 +384,7 @@ MAX_FILE_SIZE=5242880
 | SETUP.md | Detailed setup instructions |
 | PROJECT_SUMMARY.md | Complete project documentation |
 | QUICK_REFERENCE.md | This file |
+| PHASE_3_COMPLETION.md | Phase 3 completion report |
 | claude.md | Original specifications |
 
 ## 🆘 Getting Help

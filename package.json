@@ -9,9 +9,14 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
     "test": "vitest --run",
     "test:watch": "vitest"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "keywords": ["agriflow", "fertilizer", "subsidy"],
   "author": "",

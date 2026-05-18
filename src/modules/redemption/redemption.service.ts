@@ -1,6 +1,5 @@
 import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
-import { Decimal } from '@prisma/client/runtime/library';
 
 export class RedemptionService {
   async validateFarmer(petaniId: string, retailerId: string) {

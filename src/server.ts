@@ -3,7 +3,6 @@ import { config } from './config/env';
 import { connectRedis } from './config/redis';
 import logger from './utils/logger';
 import fs from 'fs';
-import path from 'path';
 
 // Create necessary directories
 const createDirectories = () => {

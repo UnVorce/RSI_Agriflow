@@ -4,7 +4,7 @@ import { LandingService } from './landing.service';
 const landingService = new LandingService();
 
 export class LandingController {
-  async getStats(req: Request, res: Response, next: NextFunction) {
+  async getStats(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const stats = await landingService.getStats();
 
@@ -17,7 +17,7 @@ export class LandingController {
     }
   }
 
-  async getAbout(req: Request, res: Response, next: NextFunction) {
+  async getAbout(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const about = await landingService.getAbout();
 
@@ -30,7 +30,7 @@ export class LandingController {
     }
   }
 
-  async getFertilizers(req: Request, res: Response, next: NextFunction) {
+  async getFertilizers(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const fertilizers = await landingService.getFertilizers();
 

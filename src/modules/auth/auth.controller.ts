@@ -5,15 +5,16 @@ import { AuthRequest } from '../../common/middleware/auth.middleware';
 const authService = new AuthService();
 
 export class AuthController {
-  async register(req: Request, res: Response, next: NextFunction) {
+  async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { fullname, email, password, role } = req.body;
       const proofPath = req.file?.filename;
 
       if (!proofPath) {
-        return res.status(400).json({ 
-          error: 'Bukti registrasi wajib diunggah' 
+        res.status(400).json({
+          error: 'Bukti registrasi wajib diunggah'
         });
+        return;
       }
 
       const user = await authService.register({
@@ -33,7 +34,7 @@ export class AuthController {
     }
   }
 
-  async login(req: Request, res: Response, next: NextFunction) {
+  async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email, password } = req.body;
 
@@ -48,7 +49,7 @@ export class AuthController {
     }
   }
 
-  async getPendingUsers(req: AuthRequest, res: Response, next: NextFunction) {
+  async getPendingUsers(_req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const users = await authService.getPendingUsers();
 
@@ -61,7 +62,7 @@ export class AuthController {
     }
   }
 
-  async approveUser(req: AuthRequest, res: Response, next: NextFunction) {
+  async approveUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
       const approverId = req.user!.userId;
@@ -77,7 +78,7 @@ export class AuthController {
     }
   }
 
-  async rejectUser(req: AuthRequest, res: Response, next: NextFunction) {
+  async rejectUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
       const approverId = req.user!.userId;
@@ -87,6 +88,44 @@ export class AuthController {
       res.json({
         message: 'Pengguna berhasil ditolak',
         data: user,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async logout(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.substring(7) || '';
+      const userId = req.user!.userId;
+
+      const result = await authService.logout(token, userId);
+
+      res.json({
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        res.status(400).json({
+          error: 'Refresh token wajib disertakan'
+        });
+        return;
+      }
+
+      const result = await authService.refreshToken(refreshToken);
+
+      res.json({
+        message: 'Token berhasil diperbarui',
+        data: result,
       });
     } catch (error) {
       next(error);

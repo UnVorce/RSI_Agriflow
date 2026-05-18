@@ -72,4 +72,62 @@ router.get('/provinces', monitoringController.getProvinces);
  */
 router.get('/trends', monitoringController.getTrends);
 
+/**
+ * @swagger
+ * /monitoring/advanced-anomaly:
+ *   get:
+ *     summary: Get ML-based advanced anomaly detection (Government only)
+ *     tags: [Monitoring]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           default: 30
+ *         description: Number of days to analyze
+ */
+router.get('/advanced-anomaly', monitoringController.getAdvancedAnomalies);
+
+/**
+ * @swagger
+ * /monitoring/forecast:
+ *   get:
+ *     summary: Get demand forecast using time series analysis (Government only)
+ *     tags: [Monitoring]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: months
+ *         schema:
+ *           type: integer
+ *           default: 3
+ *         description: Number of months to forecast
+ */
+router.get('/forecast', monitoringController.getForecast);
+
+/**
+ * @swagger
+ * /monitoring/correlations:
+ *   get:
+ *     summary: Get correlation analysis between provinces and fertilizer types (Government only)
+ *     tags: [Monitoring]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/correlations', monitoringController.getCorrelations);
+
+/**
+ * @swagger
+ * /monitoring/performance:
+ *   get:
+ *     summary: Get performance metrics and optimization recommendations (Government only)
+ *     tags: [Monitoring]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/performance', monitoringController.getPerformanceMetrics);
+
 export default router;

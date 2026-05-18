@@ -3,6 +3,7 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { errorHandler } from './common/middleware/error.middleware';
+import { apiRateLimiter } from './common/middleware/rate-limit.middleware';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
@@ -21,11 +22,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Global rate limiting for all API routes
+app.use('/api', apiRateLimiter);
+
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'OK', message: 'AgriFlow Backend is running' });
 });
 

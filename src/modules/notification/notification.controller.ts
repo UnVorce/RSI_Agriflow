@@ -107,7 +107,7 @@ export class NotificationController {
     }
   }
 
-  async getComplaints(req: AuthRequest, res: Response, next: NextFunction) {
+  async getComplaints(_req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const complaints = await notificationService.getComplaints();
 

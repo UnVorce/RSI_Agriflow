@@ -5,7 +5,7 @@ import { DashboardService } from './dashboard.service';
 const dashboardService = new DashboardService();
 
 export class DashboardController {
-  async getDashboard(req: AuthRequest, res: Response, next: NextFunction) {
+  async getDashboard(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.userId;
       const role = req.user!.role;
@@ -23,7 +23,8 @@ export class DashboardController {
           dashboard = await dashboardService.getGovernmentDashboard();
           break;
         default:
-          return res.status(403).json({ error: 'Role tidak dikenali' });
+          res.status(403).json({ error: 'Role tidak dikenali' });
+          return;
       }
 
       res.json({
