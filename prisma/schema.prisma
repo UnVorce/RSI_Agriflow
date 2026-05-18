@@ -1,0 +1,248 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+  schemas  = ["ref", "master", "trans", "evt"]
+}
+
+// ============================================
+// REFERENCE LAYER
+// ============================================
+
+model Role {
+  RoleId          Int     @id @default(autoincrement())
+  RoleName        String  @unique @db.NVarChar(50)
+  RoleDescription String? @db.NVarChar(255)
+
+  Users User[]
+
+  @@map("ROLE")
+  @@schema("ref")
+}
+
+model KodePos {
+  KodePosId     Int     @id @default(autoincrement())
+  KelurahanDesa String  @db.NVarChar(100)
+  Kecamatan     String  @db.NVarChar(100)
+  KabupatenKota String  @db.NVarChar(100)
+  Provinsi      String  @db.NVarChar(100)
+
+  Petani Petani[]
+
+  @@map("KODE_POS")
+  @@schema("ref")
+}
+
+// ============================================
+// MASTER LAYER
+// ============================================
+
+model User {
+  UserId              String    @id @default(uuid())
+  FirstName           String    @db.NVarChar(100)
+  MiddleName          String?   @db.NVarChar(100)
+  LastName            String?   @db.NVarChar(100)
+  Email               String    @unique @db.NVarChar(255)
+  HashedPassword      String    @db.NVarChar(255)
+  Status              String    @db.NVarChar(20) // Pending, Active, Rejected
+  RoleId              Int
+  RegistrationProof   String?   @db.NVarChar(500)
+  UserIdPenyetuju     String?
+  TimestampDisetujui  DateTime?
+  CreatedAt           DateTime  @default(now())
+  UpdatedAt           DateTime  @updatedAt
+
+  Role                Role      @relation(fields: [RoleId], references: [RoleId])
+  Approver            User?     @relation("UserApproval", fields: [UserIdPenyetuju], references: [UserId], onDelete: NoAction, onUpdate: NoAction)
+  ApprovedUsers       User[]    @relation("UserApproval")
+
+  Stok                Stok[]
+  RiwayatStok         RiwayatStok[]
+  KirimanDistributor  KirimanPupuk[]    @relation("DistributorShipments")
+  KirimanPengecer     KirimanPupuk[]    @relation("RetailerShipments")
+  Penebusan           PenebusanPupuk[]
+  Petani              Petani[]
+  Notifikasi          Notifikasi[]
+  Bantuan             Bantuan[]
+  LogAktivitas        LogAktivitas[]
+
+  @@map("USER")
+  @@schema("master")
+}
+
+model Pupuk {
+  PupukId     Int     @id @default(autoincrement())
+  JenisPupuk  String  @unique @db.NVarChar(100)
+
+  Stok            Stok[]
+  RiwayatStok     RiwayatStok[]
+  KirimanPupuk    KirimanPupuk[]
+  KuotaPetani     KuotaPetani[]
+  PenebusanPupuk  PenebusanPupuk[]
+
+  @@map("PUPUK")
+  @@schema("master")
+}
+
+model Petani {
+  PetaniId        String   @id @db.Char(16) // Exactly 16 digits
+  FirstName       String   @db.NVarChar(100)
+  MiddleName      String?  @db.NVarChar(100)
+  LastName        String?  @db.NVarChar(100)
+  NomorHp         String   @db.NVarChar(20)
+  Jalan           String   @db.NVarChar(255)
+  Rt              String   @db.NVarChar(5)
+  Rw              String   @db.NVarChar(5)
+  KodePosId       Int
+  Sektor          String   @db.NVarChar(100)
+  LuasLahan       Decimal  @db.Decimal(10, 2)
+  UserIdPengecer  String
+  AwalTerdaftar   DateTime
+  AkhirTerdaftar  DateTime
+  Status          String   @db.NVarChar(20)
+
+  KodePos         KodePos  @relation(fields: [KodePosId], references: [KodePosId])
+  Pengecer        User     @relation(fields: [UserIdPengecer], references: [UserId])
+
+  KuotaPetani     KuotaPetani[]
+  PenebusanPupuk  PenebusanPupuk[]
+
+  @@map("PETANI")
+  @@schema("master")
+}
+
+model KuotaPetani {
+  PetaniId   String  @db.Char(16)
+  PupukId    Int
+  SisaKuota  Decimal @db.Decimal(10, 2)
+
+  Petani     Petani  @relation(fields: [PetaniId], references: [PetaniId])
+  Pupuk      Pupuk   @relation(fields: [PupukId], references: [PupukId])
+
+  @@id([PetaniId, PupukId])
+  @@map("KUOTA_PETANI")
+  @@schema("master")
+}
+
+// ============================================
+// TRANSACTION LAYER
+// ============================================
+
+model Stok {
+  UserId    String   @db.VarChar(255)
+  PupukId   Int
+  Jumlah    Decimal  @db.Decimal(10, 2)
+  Timestamp DateTime @default(now())
+
+  User      User     @relation(fields: [UserId], references: [UserId])
+  Pupuk     Pupuk    @relation(fields: [PupukId], references: [PupukId])
+
+  @@id([UserId, PupukId])
+  @@map("STOK")
+  @@schema("trans")
+}
+
+model RiwayatStok {
+  RiwayatId      String   @id @default(uuid())
+  UserId         String
+  PupukId        Int
+  JumlahAwal     Decimal  @db.Decimal(10, 2)
+  JumlahAkhir    Decimal  @db.Decimal(10, 2)
+  TipePerubahan  String   @db.NVarChar(50) // Stok Masuk, Stok Keluar, Penyesuaian
+  Timestamp      DateTime @default(now())
+
+  User           User     @relation(fields: [UserId], references: [UserId])
+  Pupuk          Pupuk    @relation(fields: [PupukId], references: [PupukId])
+
+  @@map("RIWAYAT_STOK")
+  @@schema("trans")
+}
+
+model KirimanPupuk {
+  KirimanId          String    @id @default(uuid())
+  UserIdDistributor  String
+  UserIdPengecer     String
+  PupukId            Int
+  JumlahDikirim      Decimal   @db.Decimal(10, 2)
+  JumlahDiterima     Decimal?  @db.Decimal(10, 2)
+  Status             String    @db.NVarChar(50) // Dikirim, Diterima, Tidak Sesuai
+  TimestampDikirim   DateTime  @default(now())
+  TimestampDiterima  DateTime?
+
+  Distributor        User      @relation("DistributorShipments", fields: [UserIdDistributor], references: [UserId], onDelete: NoAction, onUpdate: NoAction)
+  Pengecer           User      @relation("RetailerShipments", fields: [UserIdPengecer], references: [UserId], onDelete: NoAction, onUpdate: NoAction)
+  Pupuk              Pupuk     @relation(fields: [PupukId], references: [PupukId])
+
+  @@map("KIRIMAN_PUPUK")
+  @@schema("trans")
+}
+
+model PenebusanPupuk {
+  TebusanId         String   @id @default(uuid())
+  UserIdPengecer    String
+  PetaniId          String   @db.Char(16)
+  PupukId           Int
+  Jumlah            Decimal  @db.Decimal(10, 2)
+  Status            String   @db.NVarChar(50)
+  TimestampPenebusan DateTime @default(now())
+
+  Pengecer          User     @relation(fields: [UserIdPengecer], references: [UserId], onDelete: NoAction, onUpdate: NoAction)
+  Petani            Petani   @relation(fields: [PetaniId], references: [PetaniId], onDelete: NoAction, onUpdate: NoAction)
+  Pupuk             Pupuk    @relation(fields: [PupukId], references: [PupukId])
+
+  @@map("PENEBUSAN_PUPUK")
+  @@schema("trans")
+}
+
+// ============================================
+// EVENT LAYER
+// ============================================
+
+model Notifikasi {
+  NotifikasiId  String   @id @default(uuid())
+  Jenis         String   @db.NVarChar(50)
+  Judul         String   @db.NVarChar(255)
+  Pesan         String   @db.NVarChar(1000)
+  StatusDibaca  Boolean  @default(false)
+  UserId        String
+  Timestamp     DateTime @default(now())
+
+  User          User     @relation(fields: [UserId], references: [UserId])
+
+  @@map("NOTIFIKASI")
+  @@schema("evt")
+}
+
+model Bantuan {
+  BantuanId   String   @id @default(uuid())
+  FirstName   String   @db.NVarChar(100)
+  MiddleName  String?  @db.NVarChar(100)
+  LastName    String?  @db.NVarChar(100)
+  Email       String   @db.NVarChar(255)
+  Topik       String   @db.NVarChar(255)
+  Ringkasan   String   @db.NVarChar(100)
+  UserId      String?
+  Timestamp   DateTime @default(now())
+
+  User        User?    @relation(fields: [UserId], references: [UserId])
+
+  @@map("BANTUAN")
+  @@schema("evt")
+}
+
+model LogAktivitas {
+  LogId      String   @id @default(uuid())
+  Aksi       String   @db.NVarChar(100)
+  Deskripsi  String   @db.NVarChar(500)
+  UserId     String?
+  Timestamp  DateTime @default(now())
+
+  User       User?    @relation(fields: [UserId], references: [UserId])
+
+  @@map("LOG_AKTIVITAS")
+  @@schema("evt")
+}
