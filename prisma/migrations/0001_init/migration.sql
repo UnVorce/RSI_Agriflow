@@ -1,18 +1,18 @@
-﻿BEGIN TRY
+BEGIN TRY
 
 BEGIN TRAN;
 
 -- CreateSchema
-EXEC sp_executesql N'CREATE SCHEMA [evt];';;
+EXEC sp_executesql N'CREATE SCHEMA [evt];';
 
 -- CreateSchema
-EXEC sp_executesql N'CREATE SCHEMA [master];';;
+EXEC sp_executesql N'CREATE SCHEMA [master];';
 
 -- CreateSchema
-EXEC sp_executesql N'CREATE SCHEMA [ref];';;
+EXEC sp_executesql N'CREATE SCHEMA [ref];';
 
 -- CreateSchema
-EXEC sp_executesql N'CREATE SCHEMA [trans];';;
+EXEC sp_executesql N'CREATE SCHEMA [trans];';
 
 -- CreateTable
 CREATE TABLE [ref].[ROLE] (
@@ -241,4 +241,3 @@ END;
 THROW
 
 END CATCH
-

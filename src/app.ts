@@ -7,13 +7,13 @@ import { apiRateLimiter } from './common/middleware/rate-limit.middleware';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
-import stockRoutes from './modules/stock/stock.routes';
-import shipmentRoutes from './modules/shipment/shipment.routes';
-import redemptionRoutes from './modules/redemption/redemption.routes';
-import dashboardRoutes from './modules/dashboard/dashboard.routes';
-import monitoringRoutes from './modules/monitoring/monitoring.routes';
-import notificationRoutes from './modules/notification/notification.routes';
 import landingRoutes from './modules/landing/landing.routes';
+import bantuanRoutes from './modules/bantuan/bantuan.routes';
+
+// Import role-based routes
+import pemerintahRoutes from './routes/pemerintah.routes';
+import distributorRoutes from './routes/distributor.routes';
+import pengecerRoutes from './routes/pengecer.routes';
 
 const app: Application = express();
 
@@ -34,14 +34,15 @@ app.get('/health', (_req, res) => {
 });
 
 // API Routes
+// Public & Auth routes
 app.use('/api/auth', authRoutes);
-app.use('/api/stock', stockRoutes);
-app.use('/api/shipments', shipmentRoutes);
-app.use('/api/redemption', redemptionRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/monitoring', monitoringRoutes);
-app.use('/api/notifications', notificationRoutes);
 app.use('/api/landing', landingRoutes);
+app.use('/api/bantuan', bantuanRoutes);
+
+// Role-based routes with prefix
+app.use('/api/pemerintah', pemerintahRoutes);
+app.use('/api/distributor', distributorRoutes);
+app.use('/api/pengecer', pengecerRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

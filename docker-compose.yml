@@ -9,7 +9,7 @@ services:
       - SA_PASSWORD=AgriFlow2024!
       - MSSQL_PID=Developer
     ports:
-      - "1433:1433"
+      - "14333:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
     networks:
