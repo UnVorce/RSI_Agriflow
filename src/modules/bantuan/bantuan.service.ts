@@ -20,39 +20,46 @@ interface GetAllBantuanParams {
 export class BantuanService {
   async createBantuan(input: CreateBantuanInput) {
     try {
-      const bantuan = await prisma.bantuan.create({
-        data: {
-          FirstName: input.firstName,
-          MiddleName: input.middleName,
-          LastName: input.lastName,
-          Email: input.email,
-          Topik: input.topik,
-          Ringkasan: input.ringkasan,
-          UserId: input.userId,
-        },
-        include: {
-          User: {
-            select: {
-              UserId: true,
-              FirstName: true,
-              MiddleName: true,
-              LastName: true,
-              Email: true,
-              Role: {
-                select: {
-                  RoleName: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      // Escape single quotes for SQL
+      const escapeSQL = (str: string | null | undefined) => 
+        str ? str.replace(/'/g, "''") : null;
 
-      logger.info(`Bantuan created: ${bantuan.BantuanId} by ${input.email}`);
+      const firstNameEsc = escapeSQL(input.firstName);
+      const middleNameParam = input.middleName ? `'${escapeSQL(input.middleName)}'` : 'NULL';
+      const lastNameParam = input.lastName ? `'${escapeSQL(input.lastName)}'` : 'NULL';
+      const emailEsc = escapeSQL(input.email);
+      const topikEsc = escapeSQL(input.topik);
+      const ringkasanEsc = escapeSQL(input.ringkasan);
+      const userIdParam = input.userId ? `'${input.userId}'` : 'NULL';
 
-      return bantuan;
+      // Execute stored procedure: dbo.usp_CreateBantuan
+      const result = await prisma.$queryRawUnsafe<any[]>(`
+        EXEC dbo.usp_CreateBantuan
+          @FirstName = '${firstNameEsc}',
+          @MiddleName = ${middleNameParam},
+          @LastName = ${lastNameParam},
+          @Email = '${emailEsc}',
+          @Topik = '${topikEsc}',
+          @Ringkasan = '${ringkasanEsc}',
+          @UserId = ${userIdParam}
+      `);
+
+      const bantuanResult = result[0];
+
+      logger.info(`Bantuan created: ${bantuanResult.BantuanId} by ${input.email}`);
+
+      return {
+        BantuanId: bantuanResult.BantuanId,
+        Pesan: bantuanResult.Pesan,
+        FirstName: input.firstName,
+        Email: input.email,
+        Topik: input.topik,
+      };
     } catch (error: any) {
       logger.error(`Error creating bantuan: ${error.message}`);
+      if (error.message.includes('tidak boleh kosong')) {
+        throw new Error(error.message);
+      }
       throw new Error('Gagal membuat bantuan');
     }
   }

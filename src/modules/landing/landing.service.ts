@@ -1,101 +1,38 @@
 import prisma from '../../config/database';
 import { Decimal } from '@prisma/client/runtime/library';
+import { StoredProcedureExecutor } from '../../utils/stored-procedures';
+
+interface LandingMetrics {
+  JumlahPetani: number;
+  JumlahPupukTersalurkan: number;
+  JumlahJenisPupuk: number;
+}
+
+interface DistribusiPupuk {
+  NamaPupuk: string;
+  JumlahTersalurkan: number;
+}
 
 export class LandingService {
   async getStats() {
-    // Total farmers
-    const totalFarmers = await prisma.petani.count();
+    // Execute stored procedure: dbo.usp_GetLandingPageData
+    const result = await prisma.$queryRawUnsafe<any[]>(`
+      EXEC dbo.usp_GetLandingPageData
+    `);
 
-    // Total distributed (in tons)
-    const redemptions = await prisma.penebusanPupuk.findMany();
-    const totalDistributedKg = redemptions.reduce(
-      (sum, r) => sum.plus(r.Jumlah),
-      new Decimal(0)
-    );
-    const distributedTon = totalDistributedKg.dividedBy(1000).toNumber();
-
-    // Fertilizer count
-    const fertilizerCount = await prisma.pupuk.count();
-
-    // Most popular fertilizer
-    const redemptionsByFertilizer = await prisma.penebusanPupuk.groupBy({
-      by: ['PupukId'],
-      _sum: {
-        Jumlah: true,
-      },
-      orderBy: {
-        _sum: {
-          Jumlah: 'desc',
-        },
-      },
-      take: 1,
-    });
-
-    let mostPopularFertilizer = 'N/A';
-    if (redemptionsByFertilizer.length > 0) {
-      const pupuk = await prisma.pupuk.findUnique({
-        where: { PupukId: redemptionsByFertilizer[0].PupukId },
-      });
-      mostPopularFertilizer = pupuk?.JenisPupuk || 'N/A';
-    }
-
-    // Active distributors and retailers
-    const activeDistributors = await prisma.user.count({
-      where: {
-        Status: 'Active',
-        Role: {
-          RoleName: 'DISTRIBUTOR',
-        },
-      },
-    });
-
-    const activeRetailers = await prisma.user.count({
-      where: {
-        Status: 'Active',
-        Role: {
-          RoleName: 'PENGECER',
-        },
-      },
-    });
-
-    // Total shipments
-    const totalShipments = await prisma.kirimanPupuk.count();
-
-    // Distribution by province
-    const redemptionsWithLocation = await prisma.penebusanPupuk.findMany({
-      include: {
-        Petani: {
-          include: {
-            KodePos: true,
-          },
-        },
-      },
-    });
-
-    const byProvince = new Map<string, Decimal>();
-    redemptionsWithLocation.forEach((r) => {
-      const province = r.Petani.KodePos.Provinsi;
-      const current = byProvince.get(province) || new Decimal(0);
-      byProvince.set(province, current.plus(r.Jumlah));
-    });
-
-    const topProvinces = Array.from(byProvince.entries())
-      .map(([province, amount]) => ({
-        province,
-        amount: amount.toNumber(),
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5);
+    // SQL Server returns multiple result sets as nested arrays
+    const metrics = result[0] as LandingMetrics;
+    const distribusi = result.slice(1) as DistribusiPupuk[];
 
     return {
-      totalFarmers,
-      distributedTon: Math.round(distributedTon * 100) / 100,
-      fertilizerCount,
-      mostPopularFertilizer,
-      activeDistributors,
-      activeRetailers,
-      totalShipments,
-      topProvinces,
+      totalFarmers: metrics.JumlahPetani,
+      distributedTon: Math.round((metrics.JumlahPupukTersalurkan / 1000) * 100) / 100,
+      fertilizerCount: metrics.JumlahJenisPupuk,
+      mostPopularFertilizer: distribusi[0]?.NamaPupuk || 'N/A',
+      fertilizerDistribution: distribusi.map(d => ({
+        name: d.NamaPupuk,
+        amount: d.JumlahTersalurkan,
+      })),
     };
   }
 

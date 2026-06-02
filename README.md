@@ -1,119 +1,84 @@
 # AgriFlow Backend
 
-Backend API for the AgriFlow fertilizer subsidy distribution system.
+Backend API untuk sistem distribusi subsidi pupuk.
 
-## Stack
+## Tech Stack
 
-- Node.js
-- TypeScript
-- Express.js
-- Prisma ORM
-- SQL Server
-- Redis
-- JWT + bcrypt
-- Zod
-- Swagger/OpenAPI
-- Vitest
+- Node.js + TypeScript + Express
+- SQL Server + Prisma ORM  
+- Redis (optional)
+- JWT Authentication
+- Zod Validation
 
-## Project Structure
+## Setup
 
-```text
-prisma/
-  migrations/
-  schema.prisma
-  seed.ts
-  setup-schemas.sql
-src/
-  common/
-  config/
-  modules/
-  utils/
-  app.ts
-  server.ts
-tests/
-```
-
-## Quick Start
-
-1. Install dependencies:
-
+### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-2. Copy environment variables:
-
+### 2. Configure Environment
 ```bash
 copy .env.example .env
 ```
 
-3. Start infrastructure:
-
-```bash
-docker-compose up -d
+Edit `.env`:
+```env
+DATABASE_URL="sqlserver://localhost:1433;database=AgriFlowDB;integratedSecurity=true;trustServerCertificate=true"
 ```
 
-4. Create the database:
-
-```bash
-docker exec -it agriflow-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P AgriFlow2024! -C -Q "IF DB_ID('AgriFlowDB') IS NULL CREATE DATABASE AgriFlowDB;"
-```
-
-If you prefer, run the SQL inside `prisma/setup-schemas.sql` manually from SSMS.
-
-5. Generate Prisma client and apply migrations:
-
+### 3. Generate Prisma Client
 ```bash
 npm run prisma:generate
-npm run prisma:deploy
 ```
 
-6. Seed initial data:
-
-```bash
-npm run prisma:seed
-```
-
-7. Start the backend:
-
+### 4. Start Server
 ```bash
 npm run dev
 ```
 
-## Available Scripts
+API: http://localhost:3000  
+Docs: http://localhost:3000/api-docs
+
+## Scripts
 
 ```bash
-npm run dev
-npm run build
-npm test
-npm run prisma:generate
-npm run prisma:migrate
-npm run prisma:deploy
-npm run prisma:seed
-npm run prisma:studio
+npm run dev          # Development
+npm run build        # Build production
+npm start            # Start production
+npm test             # Run tests
+npm run prisma:studio # Database GUI
 ```
 
-## Main Endpoints
+## API Structure
 
-- `GET /health`
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/dashboard`
-- `GET /api/monitoring`
-- `GET /api/notifications`
+```
+/api/auth/*         - Authentication
+/api/pemerintah/*   - Government endpoints
+/api/distributor/*  - Distributor endpoints  
+/api/pengecer/*     - Retailer endpoints
+```
 
-Swagger is available at `http://localhost:3000/api-docs`.
+## Database Architecture
 
-## Notes
+4 schemas:
+- `ref` - Reference data (roles, locations, products)
+- `master` - Master data (users, farmers, distributors)
+- `trans` - Transactions (shipments, redemptions, stock)
+- `evt` - Events (notifications, logs)
 
-- The database uses four SQL Server schemas: `ref`, `master`, `trans`, and `evt`.
-- Prisma migrations create those schemas and tables automatically after the database exists.
-- The seed script is idempotent, so it can be re-run safely.
-- Initial Prisma migration history is committed in `prisma/migrations`.
+## Performance
 
-## Additional Docs
+Optimized for 2M+ rows:
+- ✅ Pagination (max 100/request)
+- ✅ Database indexes
+- ✅ Redis caching
+- ✅ Connection pooling
 
-- `SETUP.md`
-- `PROJECT_SUMMARY.md`
-- `QUICK_REFERENCE.md`
-- `API_DOCUMENTATION.md`
+Target: < 500ms response time
+
+## Documentation
+
+- `SETUP.md` - Detailed setup guide
+- `API_DOCUMENTATION.md` - API reference
+- `/api-docs` - Swagger UI

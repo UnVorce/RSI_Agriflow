@@ -13,82 +13,81 @@ export class AuthService {
     role: string;
     proofPath?: string;
   }) {
-    // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { Email: data.email },
-    });
+    try {
+      // Get role ID
+      const role = await prisma.role.findUnique({
+        where: { RoleName: data.role },
+      });
 
-    if (existingUser) {
-      throw new AppError('Email sudah terdaftar', 400);
-    }
+      if (!role) {
+        throw new AppError('Role tidak valid', 400);
+      }
 
-    // Get role ID
-    const role = await prisma.role.findUnique({
-      where: { RoleName: data.role },
-    });
+      // Parse fullname
+      const nameParts = data.fullname.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;
+      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : null;
 
-    if (!role) {
-      throw new AppError('Role tidak valid', 400);
-    }
+      // Hash password
+      const hashedPassword = await hashPassword(data.password);
 
-    // Parse fullname
-    const nameParts = data.fullname.trim().split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : undefined;
-    const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : undefined;
+      // Escape single quotes in strings for SQL
+      const escapeSQL = (str: string | null) => str ? str.replace(/'/g, "''") : null;
+      
+      const firstNameEsc = escapeSQL(firstName);
+      const middleNameEsc = middleName ? `'${escapeSQL(middleName)}'` : 'NULL';
+      const lastNameEsc = lastName ? `'${escapeSQL(lastName)}'` : 'NULL';
+      const emailEsc = escapeSQL(data.email);
+      const proofEsc = data.proofPath ? `'${escapeSQL(data.proofPath)}'` : 'NULL';
 
-    // Hash password
-    const hashedPassword = await hashPassword(data.password);
+      // Execute stored procedure: dbo.usp_RegisterUser
+      const result = await prisma.$queryRawUnsafe<any[]>(`
+        EXEC dbo.usp_RegisterUser
+          @FirstName = '${firstNameEsc}',
+          @MiddleName = ${middleNameEsc},
+          @LastName = ${lastNameEsc},
+          @Email = '${emailEsc}',
+          @HashedPassword = '${hashedPassword}',
+          @RoleId = ${role.RoleId},
+          @RegistrationProof = ${proofEsc}
+      `);
 
-    // Create user with Pending status
-    const user = await prisma.user.create({
-      data: {
-        FirstName: firstName,
-        MiddleName: middleName,
-        LastName: lastName,
-        Email: data.email,
-        HashedPassword: hashedPassword,
-        Status: 'Pending',
-        RoleId: role.RoleId,
-        RegistrationProof: data.proofPath,
-      },
-      select: {
-        UserId: true,
-        FirstName: true,
-        MiddleName: true,
-        LastName: true,
-        Email: true,
-        Status: true,
-        Role: {
-          select: {
-            RoleName: true,
-          },
+      const userResult = result[0];
+
+      // Log activity
+      await prisma.logAktivitas.create({
+        data: {
+          Aksi: 'REGISTER',
+          Deskripsi: `Pengguna baru mendaftar: ${data.email}`,
+          UserId: userResult.UserId.toString(),
         },
-      },
-    });
+      });
 
-    // Log activity
-    await prisma.logAktivitas.create({
-      data: {
-        Aksi: 'REGISTER',
-        Deskripsi: `Pengguna baru mendaftar: ${data.email}`,
-        UserId: user.UserId,
-      },
-    });
+      logger.info(`New user registered: ${data.email}`);
 
-    logger.info(`New user registered: ${data.email}`);
-
-    return user;
+      return {
+        userId: userResult.UserId,
+        message: userResult.Message,
+        email: data.email,
+        status: 'Pending',
+        role: data.role,
+      };
+    } catch (error: any) {
+      if (error.message.includes('Email sudah terdaftar')) {
+        throw new AppError('Email sudah terdaftar', 400);
+      }
+      throw error;
+    }
   }
 
   async login(email: string, password: string) {
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { Email: email },
-      include: {
-        Role: true,
-      },
-    });
+    // Execute stored procedure: dbo.usp_LoginUser
+    const result = await prisma.$queryRawUnsafe<any[]>(`
+      EXEC dbo.usp_LoginUser @Email = '${email.replace(/'/g, "''")}'
+    `);
+
+    const user = result[0];
 
     if (!user) {
       throw new AppError('Email atau password salah', 401);
@@ -113,8 +112,8 @@ export class AuthService {
     // Generate tokens
     const payload = {
       userId: user.UserId,
-      email: user.Email,
-      role: user.Role.RoleName,
+      email: email,
+      role: user.RoleName,
     };
 
     const accessToken = generateAccessToken(payload);
@@ -125,7 +124,7 @@ export class AuthService {
       data: {
         Aksi: 'LOGIN',
         Deskripsi: `Pengguna login: ${email}`,
-        UserId: user.UserId,
+        UserId: user.UserId.toString(),
       },
     });
 
@@ -136,9 +135,9 @@ export class AuthService {
       refreshToken,
       user: {
         userId: user.UserId,
-        email: user.Email,
-        name: `${user.FirstName} ${user.MiddleName || ''} ${user.LastName || ''}`.trim(),
-        role: user.Role.RoleName,
+        email: email,
+        name: user.NamaLengkap,
+        role: user.RoleName,
         status: user.Status,
       },
     };

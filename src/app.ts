@@ -10,10 +10,10 @@ import authRoutes from './modules/auth/auth.routes';
 import landingRoutes from './modules/landing/landing.routes';
 import bantuanRoutes from './modules/bantuan/bantuan.routes';
 
-// Import role-based routes
-import pemerintahRoutes from './routes/pemerintah.routes';
-import distributorRoutes from './routes/distributor.routes';
-import pengecerRoutes from './routes/pengecer.routes';
+// Import module routes
+import distributorRoutes from './modules/distributor/distributor.routes';
+import pengecerRoutes from './modules/pengecer/pengecer.routes';
+import pemerintahRoutes from './modules/pemerintah/pemerintah.routes';
 
 const app: Application = express();
 

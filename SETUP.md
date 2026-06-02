@@ -1,219 +1,92 @@
 # AgriFlow Backend - Setup Guide
 
-## Quick Start
+## Prerequisites
 
-Follow these steps to get the AgriFlow backend up and running.
+- Node.js 18+
+- SQL Server (database sudah siap)
 
-## Step 1: Start Docker Services
+## Setup Steps
 
-Start SQL Server and Redis using Docker Compose:
-
-```bash
-docker-compose up -d
-```
-
-Wait about 30 seconds for SQL Server to fully initialize.
-
-## Step 2: Create Database
-
-Create the `AgriFlowDB` database before running Prisma migrations.
-
-### Option A: Using SQL Server Management Studio (SSMS)
-
-1. Connect to `localhost,1433`
-   - Username: `sa`
-   - Password: `AgriFlow2024!`
-
-2. Create the database:
-```sql
-CREATE DATABASE AgriFlowDB;
-GO
-```
-
-### Option B: Using sqlcmd (Command Line)
+### 1. Install Dependencies
 
 ```bash
-docker exec -it agriflow-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P AgriFlow2024! -C -Q "CREATE DATABASE AgriFlowDB;"
+npm install
 ```
 
-## Step 3: Run Prisma Migrations
+### 2. Configure Environment
 
-Generate Prisma client and apply the committed migration history:
+```bash
+copy .env.example .env
+```
+
+Edit `.env`:
+```env
+# Database connection
+DATABASE_URL="sqlserver://localhost:1433;database=AgriFlowDB;integratedSecurity=true;trustServerCertificate=true;connection_limit=20"
+
+# Or SQL Authentication
+# DATABASE_URL="sqlserver://sa:YourPassword@localhost:1433;database=AgriFlowDB;encrypt=true;trustServerCertificate=true;connection_limit=20"
+
+# Redis (optional)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# JWT Secrets
+JWT_ACCESS_SECRET=change-this-in-production
+JWT_REFRESH_SECRET=change-this-in-production
+
+# Server
+NODE_ENV=development
+PORT=3000
+```
+
+### 3. Generate Prisma Client
 
 ```bash
 npm run prisma:generate
-npm run prisma:deploy
 ```
 
-## Step 4: Seed Initial Data
-
-Populate the database with initial roles, fertilizer types, and a test government user:
-
-```bash
-npm run prisma:seed
-```
-
-This will create:
-- 3 Roles (PEMERINTAH, DISTRIBUTOR, PENGECER)
-- 6 Fertilizer types (Urea, NPK, ZA, Organik, SP-36, KCl)
-- Sample postal codes
-- Government test user:
-  - Email: `government@agriflow.com`
-  - Password: `password123`
-
-## Step 5: Start Development Server
+### 4. Start Server
 
 ```bash
 npm run dev
 ```
 
-The server will start on http://localhost:3000
-
-## Step 6: Test the API
-
-### Access Swagger Documentation
-
-Open your browser and go to:
-```
-http://localhost:3000/api-docs
-```
-
-### Test Health Endpoint
-
-```bash
-curl http://localhost:3000/health
-```
-
-### Test Login
-
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"government@agriflow.com\",\"password\":\"password123\"}"
-```
+Server akan berjalan di:
+- API: http://localhost:3000
+- Swagger: http://localhost:3000/api-docs
+- Health: http://localhost:3000/health
 
 ## Troubleshooting
 
-### SQL Server Connection Issues
+### SQL Server Connection Error
 
-If you get connection errors:
-
-1. Check if SQL Server is running:
+1. Check connection string di `.env`
+2. Test connection:
 ```bash
-docker ps
+sqlcmd -S localhost -E -Q "SELECT @@VERSION"
 ```
 
-2. Check SQL Server logs:
-```bash
-docker logs agriflow-sqlserver
+### Redis Error (jika pakai)
+
+Jika tidak pakai Redis, comment di `.env`:
+```env
+# REDIS_HOST=localhost  
+# REDIS_PORT=6379
 ```
 
-3. Wait 30-60 seconds after starting Docker Compose for SQL Server to fully initialize
+### Prisma Error
 
-### Redis Connection Issues
-
-Check if Redis is running:
+Generate ulang Prisma client:
 ```bash
-docker ps
-docker logs agriflow-redis
+npm run prisma:generate
 ```
 
-### Prisma Migration Issues
+## Production Notes
 
-If migrations fail:
-
-1. Ensure `AgriFlowDB` already exists
-2. Check DATABASE_URL in `.env` file
-3. Try resetting the database:
-```bash
-docker-compose down -v
-docker-compose up -d
-# Wait 30 seconds, then repeat Step 2 and Step 3
-```
-
-## Testing User Registration Flow
-
-### 1. Register a Distributor
-
-```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -F "fullname=John Distributor" \
-  -F "email=distributor@test.com" \
-  -F "password=password123" \
-  -F "role=DISTRIBUTOR" \
-  -F "proof=@/path/to/image.jpg"
-```
-
-### 2. Login as Government
-
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"government@agriflow.com\",\"password\":\"password123\"}"
-```
-
-Copy the `accessToken` from the response.
-
-### 3. Get Pending Users
-
-```bash
-curl http://localhost:3000/api/auth/pending \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-### 4. Approve User
-
-```bash
-curl -X PATCH http://localhost:3000/api/auth/approve/USER_ID \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-### 5. Login as Approved User
-
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"distributor@test.com\",\"password\":\"password123\"}"
-```
-
-## Next Steps
-
-- Explore the API documentation at http://localhost:3000/api-docs
-- Test stock management endpoints
-- Test shipment creation and receiving
-- Test redemption flow
-
-## Stopping the Services
-
-```bash
-# Stop the Node.js server
-Ctrl+C
-
-# Stop Docker services
-docker-compose down
-
-# Stop and remove volumes (WARNING: This deletes all data)
-docker-compose down -v
-```
-
-## Production Deployment Notes
-
-For production deployment:
-
-1. Change all default passwords and secrets
-2. Use proper SSL/TLS certificates
-3. Configure proper CORS origins
-4. Set NODE_ENV=production
-5. Use a proper process manager (PM2, systemd)
-6. Set up proper backup strategies for SQL Server
-7. Configure Redis persistence
-8. Set up monitoring and alerting
-9. Review and harden security settings
-10. Use environment-specific configuration files
-
-## Support
-
-For issues or questions, refer to:
-- README.md for project overview
-- claude.md for detailed specifications
-- Swagger docs at /api-docs for API reference
+1. Change all secrets di `.env`
+2. Set `NODE_ENV=production`
+3. Setup SSL/TLS
+4. Configure CORS
+5. Use PM2 atau systemd
+6. Setup monitoring

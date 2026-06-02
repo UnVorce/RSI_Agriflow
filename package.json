@@ -10,13 +10,15 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
-    "test": "vitest --run",
-    "test:watch": "vitest"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "type-check": "tsc --noEmit"
   },
   "keywords": ["agriflow", "fertilizer", "subsidy"],
   "author": "",
