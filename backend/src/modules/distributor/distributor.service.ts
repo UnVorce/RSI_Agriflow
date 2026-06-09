@@ -164,7 +164,8 @@ export class DistributorService {
           distributorId: data.distributorId, 
           pupukId: data.pupukId 
         });
-        throw new AppError(error.message, 400);
+        const dbMessage = error.message.match(/Message: `(.+?)`/)?.[1] || error.message;
+        throw new AppError(dbMessage, 400);
       }
       
       logger.error('Failed to create shipment', { 
