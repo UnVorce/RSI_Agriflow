@@ -1,0 +1,243 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- CreateSchema
+EXEC sp_executesql N'CREATE SCHEMA [evt];';
+
+-- CreateSchema
+EXEC sp_executesql N'CREATE SCHEMA [master];';
+
+-- CreateSchema
+EXEC sp_executesql N'CREATE SCHEMA [ref];';
+
+-- CreateSchema
+EXEC sp_executesql N'CREATE SCHEMA [trans];';
+
+-- CreateTable
+CREATE TABLE [ref].[ROLE] (
+    [RoleId] INT NOT NULL IDENTITY(1,1),
+    [RoleName] NVARCHAR(50) NOT NULL,
+    [RoleDescription] NVARCHAR(255),
+    CONSTRAINT [ROLE_pkey] PRIMARY KEY CLUSTERED ([RoleId]),
+    CONSTRAINT [ROLE_RoleName_key] UNIQUE NONCLUSTERED ([RoleName])
+);
+
+-- CreateTable
+CREATE TABLE [ref].[KODE_POS] (
+    [KodePosId] INT NOT NULL IDENTITY(1,1),
+    [KelurahanDesa] NVARCHAR(100) NOT NULL,
+    [Kecamatan] NVARCHAR(100) NOT NULL,
+    [KabupatenKota] NVARCHAR(100) NOT NULL,
+    [Provinsi] NVARCHAR(100) NOT NULL,
+    CONSTRAINT [KODE_POS_pkey] PRIMARY KEY CLUSTERED ([KodePosId]),
+    CONSTRAINT [KODE_POS_KelurahanDesa_Kecamatan_KabupatenKota_Provinsi_key] UNIQUE NONCLUSTERED ([KelurahanDesa],[Kecamatan],[KabupatenKota],[Provinsi])
+);
+
+-- CreateTable
+CREATE TABLE [master].[USER] (
+    [UserId] NVARCHAR(1000) NOT NULL,
+    [FirstName] NVARCHAR(100) NOT NULL,
+    [MiddleName] NVARCHAR(100),
+    [LastName] NVARCHAR(100),
+    [Email] NVARCHAR(255) NOT NULL,
+    [HashedPassword] NVARCHAR(255) NOT NULL,
+    [Status] NVARCHAR(20) NOT NULL,
+    [RoleId] INT NOT NULL,
+    [RegistrationProof] NVARCHAR(500),
+    [UserIdPenyetuju] NVARCHAR(1000),
+    [TimestampDisetujui] DATETIME2,
+    [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [USER_CreatedAt_df] DEFAULT CURRENT_TIMESTAMP,
+    [UpdatedAt] DATETIME2 NOT NULL,
+    CONSTRAINT [USER_pkey] PRIMARY KEY CLUSTERED ([UserId]),
+    CONSTRAINT [USER_Email_key] UNIQUE NONCLUSTERED ([Email])
+);
+
+-- CreateTable
+CREATE TABLE [master].[PUPUK] (
+    [PupukId] INT NOT NULL IDENTITY(1,1),
+    [JenisPupuk] NVARCHAR(100) NOT NULL,
+    CONSTRAINT [PUPUK_pkey] PRIMARY KEY CLUSTERED ([PupukId]),
+    CONSTRAINT [PUPUK_JenisPupuk_key] UNIQUE NONCLUSTERED ([JenisPupuk])
+);
+
+-- CreateTable
+CREATE TABLE [master].[PETANI] (
+    [PetaniId] CHAR(16) NOT NULL,
+    [FirstName] NVARCHAR(100) NOT NULL,
+    [MiddleName] NVARCHAR(100),
+    [LastName] NVARCHAR(100),
+    [NomorHp] NVARCHAR(20) NOT NULL,
+    [Jalan] NVARCHAR(255) NOT NULL,
+    [Rt] NVARCHAR(5) NOT NULL,
+    [Rw] NVARCHAR(5) NOT NULL,
+    [KodePosId] INT NOT NULL,
+    [Sektor] NVARCHAR(100) NOT NULL,
+    [LuasLahan] DECIMAL(10,2) NOT NULL,
+    [UserIdPengecer] NVARCHAR(1000) NOT NULL,
+    [AwalTerdaftar] DATETIME2 NOT NULL,
+    [AkhirTerdaftar] DATETIME2 NOT NULL,
+    [Status] NVARCHAR(20) NOT NULL,
+    CONSTRAINT [PETANI_pkey] PRIMARY KEY CLUSTERED ([PetaniId])
+);
+
+-- CreateTable
+CREATE TABLE [master].[KUOTA_PETANI] (
+    [PetaniId] CHAR(16) NOT NULL,
+    [PupukId] INT NOT NULL,
+    [SisaKuota] DECIMAL(10,2) NOT NULL,
+    CONSTRAINT [KUOTA_PETANI_pkey] PRIMARY KEY CLUSTERED ([PetaniId],[PupukId])
+);
+
+-- CreateTable
+CREATE TABLE [trans].[STOK] (
+    [UserId] NVARCHAR(1000) NOT NULL,
+    [PupukId] INT NOT NULL,
+    [Jumlah] DECIMAL(10,2) NOT NULL,
+    [Timestamp] DATETIME2 NOT NULL CONSTRAINT [STOK_Timestamp_df] DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT [STOK_pkey] PRIMARY KEY CLUSTERED ([UserId],[PupukId])
+);
+
+-- CreateTable
+CREATE TABLE [trans].[RIWAYAT_STOK] (
+    [RiwayatId] NVARCHAR(1000) NOT NULL,
+    [UserId] NVARCHAR(1000) NOT NULL,
+    [PupukId] INT NOT NULL,
+    [JumlahAwal] DECIMAL(10,2) NOT NULL,
+    [JumlahAkhir] DECIMAL(10,2) NOT NULL,
+    [TipePerubahan] NVARCHAR(50) NOT NULL,
+    [Timestamp] DATETIME2 NOT NULL CONSTRAINT [RIWAYAT_STOK_Timestamp_df] DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT [RIWAYAT_STOK_pkey] PRIMARY KEY CLUSTERED ([RiwayatId])
+);
+
+-- CreateTable
+CREATE TABLE [trans].[KIRIMAN_PUPUK] (
+    [KirimanId] NVARCHAR(1000) NOT NULL,
+    [UserIdDistributor] NVARCHAR(1000) NOT NULL,
+    [UserIdPengecer] NVARCHAR(1000) NOT NULL,
+    [PupukId] INT NOT NULL,
+    [JumlahDikirim] DECIMAL(10,2) NOT NULL,
+    [JumlahDiterima] DECIMAL(10,2),
+    [Status] NVARCHAR(50) NOT NULL,
+    [TimestampDikirim] DATETIME2 NOT NULL CONSTRAINT [KIRIMAN_PUPUK_TimestampDikirim_df] DEFAULT CURRENT_TIMESTAMP,
+    [TimestampDiterima] DATETIME2,
+    CONSTRAINT [KIRIMAN_PUPUK_pkey] PRIMARY KEY CLUSTERED ([KirimanId])
+);
+
+-- CreateTable
+CREATE TABLE [trans].[PENEBUSAN_PUPUK] (
+    [TebusanId] NVARCHAR(1000) NOT NULL,
+    [UserIdPengecer] NVARCHAR(1000) NOT NULL,
+    [PetaniId] CHAR(16) NOT NULL,
+    [PupukId] INT NOT NULL,
+    [Jumlah] DECIMAL(10,2) NOT NULL,
+    [Status] NVARCHAR(50) NOT NULL,
+    [TimestampPenebusan] DATETIME2 NOT NULL CONSTRAINT [PENEBUSAN_PUPUK_TimestampPenebusan_df] DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT [PENEBUSAN_PUPUK_pkey] PRIMARY KEY CLUSTERED ([TebusanId])
+);
+
+-- CreateTable
+CREATE TABLE [evt].[NOTIFIKASI] (
+    [NotifikasiId] NVARCHAR(1000) NOT NULL,
+    [Jenis] NVARCHAR(50) NOT NULL,
+    [Judul] NVARCHAR(255) NOT NULL,
+    [Pesan] NVARCHAR(1000) NOT NULL,
+    [StatusDibaca] BIT NOT NULL CONSTRAINT [NOTIFIKASI_StatusDibaca_df] DEFAULT 0,
+    [UserId] NVARCHAR(1000) NOT NULL,
+    [Timestamp] DATETIME2 NOT NULL CONSTRAINT [NOTIFIKASI_Timestamp_df] DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT [NOTIFIKASI_pkey] PRIMARY KEY CLUSTERED ([NotifikasiId])
+);
+
+-- CreateTable
+CREATE TABLE [evt].[BANTUAN] (
+    [BantuanId] NVARCHAR(1000) NOT NULL,
+    [FirstName] NVARCHAR(100) NOT NULL,
+    [MiddleName] NVARCHAR(100),
+    [LastName] NVARCHAR(100),
+    [Email] NVARCHAR(255) NOT NULL,
+    [Topik] NVARCHAR(255) NOT NULL,
+    [Ringkasan] NVARCHAR(100) NOT NULL,
+    [UserId] NVARCHAR(1000),
+    [Timestamp] DATETIME2 NOT NULL CONSTRAINT [BANTUAN_Timestamp_df] DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT [BANTUAN_pkey] PRIMARY KEY CLUSTERED ([BantuanId])
+);
+
+-- CreateTable
+CREATE TABLE [evt].[LOG_AKTIVITAS] (
+    [LogId] NVARCHAR(1000) NOT NULL,
+    [Aksi] NVARCHAR(100) NOT NULL,
+    [Deskripsi] NVARCHAR(500) NOT NULL,
+    [UserId] NVARCHAR(1000),
+    [Timestamp] DATETIME2 NOT NULL CONSTRAINT [LOG_AKTIVITAS_Timestamp_df] DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT [LOG_AKTIVITAS_pkey] PRIMARY KEY CLUSTERED ([LogId])
+);
+
+-- AddForeignKey
+ALTER TABLE [master].[USER] ADD CONSTRAINT [USER_RoleId_fkey] FOREIGN KEY ([RoleId]) REFERENCES [ref].[ROLE]([RoleId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [master].[USER] ADD CONSTRAINT [USER_UserIdPenyetuju_fkey] FOREIGN KEY ([UserIdPenyetuju]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [master].[PETANI] ADD CONSTRAINT [PETANI_KodePosId_fkey] FOREIGN KEY ([KodePosId]) REFERENCES [ref].[KODE_POS]([KodePosId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [master].[PETANI] ADD CONSTRAINT [PETANI_UserIdPengecer_fkey] FOREIGN KEY ([UserIdPengecer]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [master].[KUOTA_PETANI] ADD CONSTRAINT [KUOTA_PETANI_PetaniId_fkey] FOREIGN KEY ([PetaniId]) REFERENCES [master].[PETANI]([PetaniId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [master].[KUOTA_PETANI] ADD CONSTRAINT [KUOTA_PETANI_PupukId_fkey] FOREIGN KEY ([PupukId]) REFERENCES [master].[PUPUK]([PupukId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [trans].[STOK] ADD CONSTRAINT [STOK_UserId_fkey] FOREIGN KEY ([UserId]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [trans].[STOK] ADD CONSTRAINT [STOK_PupukId_fkey] FOREIGN KEY ([PupukId]) REFERENCES [master].[PUPUK]([PupukId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [trans].[RIWAYAT_STOK] ADD CONSTRAINT [RIWAYAT_STOK_UserId_fkey] FOREIGN KEY ([UserId]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [trans].[RIWAYAT_STOK] ADD CONSTRAINT [RIWAYAT_STOK_PupukId_fkey] FOREIGN KEY ([PupukId]) REFERENCES [master].[PUPUK]([PupukId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [trans].[KIRIMAN_PUPUK] ADD CONSTRAINT [KIRIMAN_PUPUK_UserIdDistributor_fkey] FOREIGN KEY ([UserIdDistributor]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [trans].[KIRIMAN_PUPUK] ADD CONSTRAINT [KIRIMAN_PUPUK_UserIdPengecer_fkey] FOREIGN KEY ([UserIdPengecer]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [trans].[KIRIMAN_PUPUK] ADD CONSTRAINT [KIRIMAN_PUPUK_PupukId_fkey] FOREIGN KEY ([PupukId]) REFERENCES [master].[PUPUK]([PupukId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [trans].[PENEBUSAN_PUPUK] ADD CONSTRAINT [PENEBUSAN_PUPUK_UserIdPengecer_fkey] FOREIGN KEY ([UserIdPengecer]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [trans].[PENEBUSAN_PUPUK] ADD CONSTRAINT [PENEBUSAN_PUPUK_PetaniId_fkey] FOREIGN KEY ([PetaniId]) REFERENCES [master].[PETANI]([PetaniId]) ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE [trans].[PENEBUSAN_PUPUK] ADD CONSTRAINT [PENEBUSAN_PUPUK_PupukId_fkey] FOREIGN KEY ([PupukId]) REFERENCES [master].[PUPUK]([PupukId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [evt].[NOTIFIKASI] ADD CONSTRAINT [NOTIFIKASI_UserId_fkey] FOREIGN KEY ([UserId]) REFERENCES [master].[USER]([UserId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [evt].[BANTUAN] ADD CONSTRAINT [BANTUAN_UserId_fkey] FOREIGN KEY ([UserId]) REFERENCES [master].[USER]([UserId]) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE [evt].[LOG_AKTIVITAS] ADD CONSTRAINT [LOG_AKTIVITAS_UserId_fkey] FOREIGN KEY ([UserId]) REFERENCES [master].[USER]([UserId]) ON DELETE SET NULL ON UPDATE CASCADE;
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH
