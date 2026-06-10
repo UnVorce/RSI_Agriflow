@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { PemerintahController } from './pemerintah.controller';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { checkRole } from '../../common/middleware/role.middleware';
+import { requireRole } from '../../common/middleware/role.middleware';
 
 const router = Router();
 const controller = new PemerintahController();
 
 // All routes require authentication and Pemerintah role
 router.use(authenticate);
-router.use(checkRole(['Pemerintah']));
+router.use(requireRole('PEMERINTAH'));
 
 // Dashboard & Analytics
 router.get('/dashboard', controller.getDashboard.bind(controller));

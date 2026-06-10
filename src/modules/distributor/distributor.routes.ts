@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { DistributorController } from './distributor.controller';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { checkRole } from '../../common/middleware/role.middleware';
+import { requireRole } from '../../common/middleware/role.middleware';
 
 const router = Router();
 const controller = new DistributorController();
 
 // All routes require authentication and Distributor role
 router.use(authenticate);
-router.use(checkRole(['Distributor']));
+router.use(requireRole('DISTRIBUTOR'));
 
 // Dashboard
 router.get('/dashboard', controller.getDashboard.bind(controller));

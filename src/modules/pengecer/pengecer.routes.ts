@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { PengecerController } from './pengecer.controller';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { checkRole } from '../../common/middleware/role.middleware';
+import { requireRole } from '../../common/middleware/role.middleware';
 
 const router = Router();
 const controller = new PengecerController();
 
 // All routes require authentication and Pengecer role
 router.use(authenticate);
-router.use(checkRole(['Pengecer']));
+router.use(requireRole('PENGECER'));
 
 // Dashboard
 router.get('/dashboard', controller.getDashboard.bind(controller));
