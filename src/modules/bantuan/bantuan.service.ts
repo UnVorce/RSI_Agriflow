@@ -1,5 +1,7 @@
-import { prisma } from '../../config/database';
-import { logger } from '../../utils/logger';
+import prisma from '../../config/database';
+import logger from '../../utils/logger';
+import { parseDatabaseError } from '../../utils/fsdErrorHandler';
+import { ERR_VAL_02, ERR_SYS_02 } from '../../common/errors/fsdErrors';
 
 interface CreateBantuanInput {
   firstName: string;
@@ -17,9 +19,19 @@ interface GetAllBantuanParams {
   topik?: string;
 }
 
+/**
+ * Bantuan Service - FSD-Compliant Error Handling
+ * ERR-VAL-06: Field wajib kosong
+ * ERR-SYS-02: Gagal menyimpan bantuan
+ */
 export class BantuanService {
   async createBantuan(input: CreateBantuanInput) {
     try {
+      // Validate required fields
+      if (!input.firstName || !input.email || !input.topik || !input.ringkasan) {
+        throw ERR_VAL_02();
+      }
+
       // Escape single quotes for SQL
       const escapeSQL = (str: string | null | undefined) => 
         str ? str.replace(/'/g, "''") : null;
@@ -32,7 +44,6 @@ export class BantuanService {
       const ringkasanEsc = escapeSQL(input.ringkasan);
       const userIdParam = input.userId != null ? `${input.userId}` : 'NULL';
 
-      // Execute stored procedure: dbo.usp_CreateBantuan
       const result = await prisma.$queryRawUnsafe<any[]>(`
         EXEC dbo.usp_CreateBantuan
           @FirstName = '${firstNameEsc}',
@@ -44,23 +55,26 @@ export class BantuanService {
           @UserId = ${userIdParam}
       `);
 
-      const bantuanResult = result[0];
+      const bantuanResult = Array.isArray(result) && result.length > 0 ? result[0] : result;
 
-      logger.info(`Bantuan created: ${bantuanResult.BantuanId} by ${input.email}`);
+      if (!bantuanResult) {
+        throw ERR_SYS_02('Stored procedure tidak mengembalikan hasil');
+      }
+
+      logger.info(`Bantuan created: ${bantuanResult.BantuanId || 'unknown'} by ${input.email}`);
 
       return {
-        BantuanId: bantuanResult.BantuanId,
-        Pesan: bantuanResult.Pesan,
+        BantuanId: bantuanResult.BantuanId || null,
+        Pesan: bantuanResult.Pesan || 'Bantuan berhasil dikirim',
         FirstName: input.firstName,
         Email: input.email,
         Topik: input.topik,
       };
     } catch (error: any) {
-      logger.error(`Error creating bantuan: ${error.message}`);
-      if (error.message.includes('tidak boleh kosong')) {
-        throw new Error(error.message);
-      }
-      throw new Error('Gagal membuat bantuan');
+      if (error.name === 'ValidationError' || error.name === 'SystemError' || error.name === 'FSDError') throw error;
+      
+      logger.error(`Error creating bantuan: ${error.message}`, { error });
+      throw parseDatabaseError(error);
     }
   }
 
@@ -115,7 +129,7 @@ export class BantuanService {
       };
     } catch (error: any) {
       logger.error(`Error getting all bantuan: ${error.message}`);
-      throw new Error('Gagal mengambil data bantuan');
+      throw parseDatabaseError(error);
     }
   }
 
@@ -146,7 +160,7 @@ export class BantuanService {
       return bantuan;
     } catch (error: any) {
       logger.error(`Error getting bantuan by ID: ${error.message}`);
-      throw new Error('Gagal mengambil data bantuan');
+      throw parseDatabaseError(error);
     }
   }
 
@@ -164,7 +178,7 @@ export class BantuanService {
       return bantuan;
     } catch (error: any) {
       logger.error(`Error getting bantuan by user ID: ${error.message}`);
-      throw new Error('Gagal mengambil data bantuan');
+      throw parseDatabaseError(error);
     }
   }
 }

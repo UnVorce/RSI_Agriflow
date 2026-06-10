@@ -1,23 +1,19 @@
 import prisma from '../../config/database';
-import { AppError } from '../../common/middleware/error.middleware';
 import logger from '../../utils/logger';
+import { parseDatabaseError } from '../../utils/fsdErrorHandler';
+import { ERR_BUS_02, ERR_INVALID_AMOUNT } from '../../common/errors/fsdErrors';
 
 /**
- * Distributor Service
- * Handles all distributor-related business logic using stored procedures
- * All queries use parameterized queries to prevent SQL injection
+ * Distributor Service - FSD-Compliant Error Handling
+ * All errors are mapped to specific FSD error codes (ERR-BUS, ERR-VAL, ERR-SYS)
+ * NEVER exposes technical details to users
  */
 export class DistributorService {
-  /**
-   * Get distributor dashboard data
-   * Composed from multiple individual queries (avoiding multi-result-set SP limitation)
-   */
   async getDashboard(userId: number) {
     const startTime = Date.now();
     
     try {
       const [stockRows, recentShipments, recentStockOut, notifications] = await Promise.all([
-        // 1. Stock summary (total, inbound, outbound)
         prisma.$queryRaw<any[]>`
           SELECT
             COALESCE(SUM(s.Jumlah), 0) AS totalStock,
@@ -36,9 +32,7 @@ export class DistributorService {
           FROM trans.STOK s
           WHERE s.UserId = ${userId}
         `,
-        // 2. Recent shipments (TOP 3)
         prisma.$queryRaw<any[]>`EXEC dbo.usp_GetRecentKiriman @UserIdDistributor = ${userId}`,
-        // 3. Recent stock out (TOP 3)
         prisma.$queryRaw<any[]>`
           SELECT TOP 3
             s.PupukId AS pupukId,
@@ -51,14 +45,10 @@ export class DistributorService {
           WHERE s.UserId = ${userId}
           ORDER BY s.Timestamp DESC
         `,
-        // 4. Notifications (TOP 5)
         prisma.$queryRaw<any[]>`EXEC dbo.usp_GetDistributorNotifikasi @UserId = ${userId}`,
       ]);
 
-      logger.info('Dashboard retrieved', {
-        userId,
-        duration: Date.now() - startTime
-      });
+      logger.info('Dashboard retrieved', { userId, duration: Date.now() - startTime });
 
       return {
         stockSummary: stockRows[0] || { totalStock: 0, totalInbound: 0, totalOutgoing: 0 },
@@ -84,14 +74,10 @@ export class DistributorService {
       };
     } catch (error: any) {
       logger.error('Failed to get dashboard', { userId, error: error.message });
-      throw new AppError('Gagal mengambil data dashboard', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get recent shipments
-   * SP: dbo.usp_GetRecentKiriman
-   */
   async getRecentShipments(userId: number) {
     try {
       const result = await prisma.$queryRaw<any[]>`
@@ -100,16 +86,16 @@ export class DistributorService {
       return result;
     } catch (error: any) {
       logger.error('Failed to get recent shipments', { userId, error: error.message });
-      throw new AppError('Gagal mengambil data pengiriman', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Validate pengecer (retailer) before creating shipment
-   * SP: dbo.usp_ValidatePengecer
-   */
   async validatePengecer(pengecerId: number) {
     try {
+      if (!pengecerId || pengecerId <= 0 || !Number.isInteger(pengecerId)) {
+        throw ERR_BUS_02();
+      }
+
       const result = await prisma.$queryRaw<any[]>`
         EXEC dbo.usp_ValidatePengecer @UserIdPengecer = ${pengecerId}
       `;
@@ -117,21 +103,17 @@ export class DistributorService {
       const validation = result[0];
       
       if (!validation.IsValid) {
-        throw new AppError(validation.Message, 400);
+        throw parseDatabaseError({ message: validation.Message });
       }
 
       return validation;
     } catch (error: any) {
-      if (error instanceof AppError) throw error;
+      if (error.name === 'BusinessRuleError' || error.name === 'ValidationError' || error.name === 'FSDError') throw error;
       logger.error('Failed to validate pengecer', { pengecerId, error: error.message });
-      throw new AppError('Gagal validasi pengecer', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Create new shipment to pengecer
-   * SP: dbo.usp_CreateKiriman
-   */
   async createShipment(data: {
     distributorId: number;
     pengecerId: number;
@@ -142,14 +124,16 @@ export class DistributorService {
     const startTime = Date.now();
     
     try {
-      const result = await prisma.$queryRaw<any[]>`
+      const timestampKirim = data.timestamp ? data.timestamp.toISOString() : null;
+      
+      const result = await prisma.$queryRawUnsafe(`
         EXEC dbo.usp_CreateKiriman
           @UserIdDistributor = ${data.distributorId},
           @UserIdPengecer = ${data.pengecerId},
           @PupukId = ${data.pupukId},
           @Jumlah = ${data.jumlah},
-          @TimestampKirim = ${data.timestamp || null}
-      `;
+          @TimestampKirim = ${timestampKirim ? `'${timestampKirim}'` : 'NULL'}
+      `);
 
       logger.info('Shipment created', {
         distributorId: data.distributorId,
@@ -159,26 +143,11 @@ export class DistributorService {
 
       return result[0];
     } catch (error: any) {
-      if (error.message.includes('Stok tidak mencukupi')) {
-        logger.warn('Insufficient stock', { 
-          distributorId: data.distributorId, 
-          pupukId: data.pupukId 
-        });
-        throw new AppError(error.message, 400);
-      }
-      
-      logger.error('Failed to create shipment', { 
-        data, 
-        error: error.message 
-      });
-      throw new AppError('Gagal membuat pengiriman', 500);
+      logger.error('Failed to create shipment', { data, error: error.message });
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get stock dashboard with pagination
-   * Composed from individual queries (avoiding multi-result-set SP limitation)
-   */
   async getStockDashboard(userId: number, pageNumber: number = 1) {
     try {
       const [totalRows, stockItems] = await Promise.all([
@@ -206,14 +175,10 @@ export class DistributorService {
       };
     } catch (error: any) {
       logger.error('Failed to get stock dashboard', { userId, error: error.message });
-      throw new AppError('Gagal mengambil data stok', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get current stock for specific fertilizer
-   * SP: dbo.usp_GetStokPupukSaatIni
-   */
   async getCurrentStock(userId: number, pupukId: number) {
     try {
       const result = await prisma.$queryRaw<any[]>`
@@ -225,14 +190,10 @@ export class DistributorService {
       return result[0];
     } catch (error: any) {
       logger.error('Failed to get current stock', { userId, pupukId, error: error.message });
-      throw new AppError('Gagal mengambil data stok', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Adjust stock (add or reduce)
-   * SP: dbo.usp_AdjustStokDistributor
-   */
   async adjustStock(data: {
     userId: number;
     pupukId: number;
@@ -240,13 +201,15 @@ export class DistributorService {
     waktu?: Date;
   }) {
     try {
-      const result = await prisma.$queryRaw<any[]>`
+      const waktu = data.waktu ? data.waktu.toISOString() : null;
+      
+      const result = await prisma.$queryRawUnsafe(`
         EXEC dbo.usp_AdjustStokDistributor
           @UserId = ${data.userId},
           @PupukId = ${data.pupukId},
           @JumlahPenyesuaian = ${data.jumlahPenyesuaian},
-          @Waktu = ${data.waktu || null}
-      `;
+          @Waktu = ${waktu ? `'${waktu}'` : 'NULL'}
+      `);
 
       logger.info('Stock adjusted', { 
         userId: data.userId, 
@@ -256,18 +219,11 @@ export class DistributorService {
 
       return result[0];
     } catch (error: any) {
-      if (error.message.includes('Stok tidak mencukupi')) {
-        throw new AppError(error.message, 400);
-      }
       logger.error('Failed to adjust stock', { data, error: error.message });
-      throw new AppError('Gagal menyesuaikan stok', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Add incoming stock
-   * SP: dbo.usp_TambahStokDistributor
-   */
   async addStock(data: {
     userId: number;
     pupukId: number;
@@ -276,16 +232,18 @@ export class DistributorService {
   }) {
     try {
       if (data.jumlahMasuk <= 0) {
-        throw new AppError('Jumlah stok masuk harus lebih dari 0', 400);
+        throw ERR_INVALID_AMOUNT();
       }
 
-      const result = await prisma.$queryRaw<any[]>`
+      const waktu = data.waktu ? data.waktu.toISOString() : null;
+      
+      const result = await prisma.$queryRawUnsafe(`
         EXEC dbo.usp_TambahStokDistributor
           @UserId = ${data.userId},
           @PupukId = ${data.pupukId},
           @JumlahMasuk = ${data.jumlahMasuk},
-          @Waktu = ${data.waktu || null}
-      `;
+          @Waktu = ${waktu ? `'${waktu}'` : 'NULL'}
+      `);
 
       logger.info('Stock added', { 
         userId: data.userId, 
@@ -295,16 +253,12 @@ export class DistributorService {
 
       return result[0];
     } catch (error: any) {
-      if (error instanceof AppError) throw error;
+      if (error.name === 'ValidationError' || error.name === 'FSDError') throw error;
       logger.error('Failed to add stock', { data, error: error.message });
-      throw new AppError('Gagal menambah stok', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get shipment history with pagination
-   * Composed from individual queries (avoiding multi-result-set SP limitation)
-   */
   async getShipmentHistory(userId: number, pageNumber: number = 1) {
     try {
       const [summary, shipments] = await Promise.all([
@@ -357,13 +311,10 @@ export class DistributorService {
       };
     } catch (error: any) {
       logger.error('Failed to get shipment history', { userId, error: error.message });
-      throw new AppError('Gagal mengambil riwayat pengiriman', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get incoming stock history with pagination
-   */
   async getIncomingStockHistory(userId: number, pageNumber: number = 1) {
     try {
       const rows = await prisma.$queryRaw<any[]>`
@@ -390,13 +341,10 @@ export class DistributorService {
       }));
     } catch (error: any) {
       logger.error('Failed to get incoming stock history', { userId, error: error.message });
-      throw new AppError('Gagal mengambil riwayat stok masuk', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get outgoing stock history with pagination
-   */
   async getOutgoingStockHistory(userId: number, pageNumber: number = 1) {
     try {
       const rows = await prisma.$queryRaw<any[]>`
@@ -423,14 +371,10 @@ export class DistributorService {
       }));
     } catch (error: any) {
       logger.error('Failed to get outgoing stock history', { userId, error: error.message });
-      throw new AppError('Gagal mengambil riwayat stok keluar', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get notifications with pagination
-   * SP: dbo.usp_GetDistributorNotifikasi
-   */
   async getNotifications(userId: number, pageNumber: number = 1) {
     try {
       const rows = await prisma.$queryRaw<any[]>`
@@ -447,14 +391,10 @@ export class DistributorService {
       }));
     } catch (error: any) {
       logger.error('Failed to get notifications', { userId, error: error.message });
-      throw new AppError('Gagal mengambil notifikasi', 500);
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Mark notification as read
-   * SP: dbo.usp_MarkNotifikasiDibaca
-   */
   async markNotificationRead(notifikasiId: number, userId: number) {
     try {
       const result = await prisma.$queryRaw<any[]>`
@@ -470,7 +410,7 @@ export class DistributorService {
         userId, 
         error: error.message 
       });
-      throw new AppError('Gagal menandai notifikasi', 500);
+      throw parseDatabaseError(error);
     }
   }
 }

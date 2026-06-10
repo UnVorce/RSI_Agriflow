@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../../utils/logger';
+import { FSDError } from '../errors/fsdErrors';
 
 export class AppError extends Error {
   statusCode: number;
@@ -15,18 +16,38 @@ export class AppError extends Error {
 }
 
 export const errorHandler = (
-  err: Error | AppError,
+  err: Error | AppError | FSDError,
   req: Request,
   res: Response,
   _next: NextFunction
 ) => {
+  // Log technical details (never sent to user)
   logger.error('Error:', {
     message: err.message,
-    stack: err.stack,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     url: req.url,
     method: req.method,
   });
 
+  // FSD-compliant error handling
+  if (err instanceof FSDError) {
+    // Log technical details separately for debugging
+    if (err.technicalDetails) {
+      logger.error('Technical details:', {
+        errorId: err.errorId,
+        details: err.technicalDetails,
+      });
+    }
+
+    // Return user-friendly message with error ID
+    return res.status(err.statusCode).json({
+      success: false,
+      errorId: err.errorId,
+      message: err.userMessage,
+    });
+  }
+
+  // Legacy AppError support
   if (err instanceof AppError || (err as any).isOperational) {
     return res.status((err as any).statusCode || 500).json({
       success: false,
@@ -34,9 +55,11 @@ export const errorHandler = (
     });
   }
 
-  // Default error
+  // Default: Generic system error (ERR-SYS-01)
+  // NEVER expose technical details to users
   return res.status(500).json({
     success: false,
-    error: 'Terjadi kesalahan pada server',
+    errorId: 'ERR-SYS-01',
+    message: 'Layanan sedang tidak tersedia. Silakan coba beberapa saat lagi.',
   });
 };

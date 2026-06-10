@@ -1,5 +1,7 @@
-import { prisma } from '../../config/database';
-import { logger } from '../../utils/logger';
+import prisma from '../../config/database';
+import logger from '../../utils/logger';
+import { parseDatabaseError } from '../../utils/fsdErrorHandler';
+import { ERR_BUS_04, ERR_VAL_05, ERR_VAL_03 } from '../../common/errors/fsdErrors';
 
 interface GetFarmersParams {
   page: number;
@@ -26,6 +28,12 @@ interface CreateFarmerInput {
   status: string;
 }
 
+/**
+ * Petani Service - FSD-Compliant Error Handling
+ * ERR-VAL-05: Format ID Petani (16 digit)
+ * ERR-BUS-04: Petani not found
+ * ERR-VAL-03: Duplicate ID Petani
+ */
 export class PetaniService {
   async getFarmersByRetailer(
     userIdPengecer: number,
@@ -82,7 +90,7 @@ export class PetaniService {
       };
     } catch (error: any) {
       logger.error(`Error getting farmers: ${error.message}`);
-      throw new Error('Gagal mengambil data petani');
+      throw parseDatabaseError(error);
     }
   }
 
@@ -112,10 +120,15 @@ export class PetaniService {
         },
       });
 
+      if (!farmer) {
+        throw ERR_BUS_04();
+      }
+
       return farmer;
     } catch (error: any) {
+      if (error.name === 'BusinessRuleError' || error.name === 'FSDError') throw error;
       logger.error(`Error getting farmer by ID: ${error.message}`);
-      throw new Error('Gagal mengambil data petani');
+      throw parseDatabaseError(error);
     }
   }
 
@@ -130,7 +143,7 @@ export class PetaniService {
       });
 
       if (!farmer) {
-        throw new Error('Petani tidak ditemukan');
+        throw ERR_BUS_04();
       }
 
       const quota = await prisma.kuotaPetani.findMany({
@@ -144,16 +157,17 @@ export class PetaniService {
 
       return quota;
     } catch (error: any) {
+      if (error.name === 'BusinessRuleError' || error.name === 'FSDError') throw error;
       logger.error(`Error getting farmer quota: ${error.message}`);
-      throw error;
+      throw parseDatabaseError(error);
     }
   }
 
   async createFarmer(input: CreateFarmerInput) {
     try {
-      // Validate 16-digit ID
+      // ERR-VAL-05: Validate 16-digit ID
       if (!/^\d{16}$/.test(input.petaniId)) {
-        throw new Error('ID Petani harus 16 digit angka');
+        throw ERR_VAL_05();
       }
 
       // Check if farmer already exists
@@ -164,7 +178,7 @@ export class PetaniService {
       });
 
       if (existing) {
-        throw new Error('ID Petani sudah terdaftar');
+        throw ERR_VAL_03(); // Duplicate (generic message)
       }
 
       const farmer = await prisma.petani.create({
@@ -194,8 +208,9 @@ export class PetaniService {
 
       return farmer;
     } catch (error: any) {
+      if (error.name === 'ValidationError' || error.name === 'FSDError') throw error;
       logger.error(`Error creating farmer: ${error.message}`);
-      throw error;
+      throw parseDatabaseError(error);
     }
   }
 
@@ -214,7 +229,7 @@ export class PetaniService {
       });
 
       if (!existing) {
-        throw new Error('Petani tidak ditemukan');
+        throw ERR_BUS_04();
       }
 
       const farmer = await prisma.petani.update({
@@ -245,8 +260,9 @@ export class PetaniService {
 
       return farmer;
     } catch (error: any) {
+      if (error.name === 'BusinessRuleError' || error.name === 'FSDError') throw error;
       logger.error(`Error updating farmer: ${error.message}`);
-      throw error;
+      throw parseDatabaseError(error);
     }
   }
 
@@ -261,7 +277,7 @@ export class PetaniService {
       });
 
       if (!existing) {
-        throw new Error('Petani tidak ditemukan');
+        throw ERR_BUS_04();
       }
 
       // Delete farmer quotas first
@@ -280,8 +296,9 @@ export class PetaniService {
 
       logger.info(`Farmer deleted: ${petaniId}`);
     } catch (error: any) {
+      if (error.name === 'BusinessRuleError' || error.name === 'FSDError') throw error;
       logger.error(`Error deleting farmer: ${error.message}`);
-      throw error;
+      throw parseDatabaseError(error);
     }
   }
 }

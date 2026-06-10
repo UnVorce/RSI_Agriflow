@@ -41,6 +41,30 @@ router.post('/', bantuanController.submitBantuan);
 
 /**
  * @swagger
+ * /bantuan:
+ *   get:
+ *     summary: Get all help requests with pagination
+ *     tags: [Bantuan]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: topik
+ *         schema:
+ *           type: string
+ */
+router.get('/', bantuanController.getAllBantuan);
+
+/**
+ * @swagger
  * /bantuan/my:
  *   get:
  *     summary: Get my help requests

@@ -1,91 +1,105 @@
 import prisma from '../../config/database';
-import { AppError } from '../../common/middleware/error.middleware';
+import logger from '../../utils/logger';
+import { parseDatabaseError } from '../../utils/fsdErrorHandler';
+import { ERR_SYS_03 } from '../../common/errors/fsdErrors';
 
 /**
- * Pemerintah (Government) Service
- * Handles all government-related business logic using stored procedures
+ * Pemerintah (Government) Service - FSD-Compliant Error Handling
+ * All errors mapped to FSD codes
  */
 export class PemerintahService {
-  /**
-   * Get top 3 unread notifications for home page
-   * SP: dbo.usp_GetPemerintahNotifikasiTop3
-   */
   async getTopNotifications(userId: number) {
-    const result = await prisma.$queryRawUnsafe<any[]>(`
-      EXEC dbo.usp_GetPemerintahNotifikasiTop3 @UserId = ${userId}
-    `);
+    try {
+      const result = await prisma.$queryRawUnsafe<any[]>(`
+        EXEC dbo.usp_GetPemerintahNotifikasiTop3 @UserId = ${userId}
+      `);
 
-    return result;
+      return result;
+    } catch (error: any) {
+      logger.error('Failed to get top notifications', { userId, error: error.message });
+      throw parseDatabaseError(error);
+    }
   }
 
-  /**
-   * Get comprehensive dashboard with filters
-   * SP: dbo.usp_GetPemerintahDashboard
-   */
   async getDashboard(filters: {
     provinsi?: string;
     tahunAwal?: number;
     tahunAkhir?: number;
     pupukId?: number;
   }) {
-    const provinsiParam = filters.provinsi ? `'${filters.provinsi}'` : 'NULL';
-    const tahunAwalParam = filters.tahunAwal || 'NULL';
-    const tahunAkhirParam = filters.tahunAkhir || 'NULL';
-    const pupukIdParam = filters.pupukId || 'NULL';
+    try {
+      const provinsiParam = filters.provinsi ? `'${filters.provinsi}'` : 'NULL';
+      const tahunAwalParam = filters.tahunAwal ? filters.tahunAwal : 'NULL';
+      const tahunAkhirParam = filters.tahunAkhir ? filters.tahunAkhir : 'NULL';
+      const pupukIdParam = filters.pupukId ? filters.pupukId : 'NULL';
 
-    const result = await prisma.$queryRawUnsafe<any>(`
-      EXEC dbo.usp_GetPemerintahDashboard
-        @Provinsi = ${provinsiParam},
-        @TahunAwal = ${tahunAwalParam},
-        @TahunAkhir = ${tahunAkhirParam},
-        @PupukId = ${pupukIdParam}
-    `);
+      const result = await prisma.$queryRawUnsafe<any>(`
+        EXEC dbo.usp_GetPemerintahDashboard
+          @Provinsi = ${provinsiParam},
+          @TahunAwal = ${tahunAwalParam},
+          @TahunAkhir = ${tahunAkhirParam},
+          @PupukId = ${pupukIdParam}
+      `);
 
-    return {
-      mapByProvince: result[0] || [],
-      totalAbsorbed: result[1],
-      realizationPercent: result[2],
-      topProvinces: result[3] || [],
-      monthlyTrend: result[4] || [],
-      topSectors: result[5] || [],
-    };
+      return {
+        mapByProvince: result[0] || [],
+        totalAbsorbed: result[1],
+        realizationPercent: result[2],
+        topProvinces: result[3] || [],
+        monthlyTrend: result[4] || [],
+        topSectors: result[5] || [],
+      };
+    } catch (error: any) {
+      logger.error('Failed to get pemerintah dashboard', { filters, error: error.message });
+      throw parseDatabaseError(error);
+    }
   }
 
-  /**
-   * Get anomaly detection notifications
-   * SP: dbo.usp_GetPemerintahDeteksiAnomali
-   */
   async getAnomalies(userId: number, pageNumber: number = 1) {
-    const result = await prisma.$queryRawUnsafe<any[]>(`
-      EXEC dbo.usp_GetPemerintahDeteksiAnomali
-        @UserId = ${userId},
-        @PageNumber = ${pageNumber}
-    `);
+    try {
+      const result = await prisma.$queryRawUnsafe<any[]>(`
+        EXEC dbo.usp_GetPemerintahDeteksiAnomali
+          @UserId = ${userId},
+          @PageNumber = ${pageNumber}
+      `);
 
-    return result;
+      return result;
+    } catch (error: any) {
+      logger.error('Failed to get anomalies', { userId, error: error.message });
+      throw parseDatabaseError(error);
+    }
   }
 
-  /**
-   * Get pending users for verification
-   * SP: dbo.usp_GetPemerintahVerifikasiPendaftar
-   */
   async getPendingUsers(pageNumber: number = 1, pageSize: number = 6) {
-    const result = await prisma.$queryRawUnsafe<any>(`
-      EXEC dbo.usp_GetPemerintahVerifikasiPendaftar
-        @PageNumber = ${pageNumber},
-        @PageSize = ${pageSize}
-    `);
+    try {
+      const result = await prisma.$queryRawUnsafe<any>(`
+        EXEC dbo.usp_GetPemerintahVerifikasiPendaftar
+          @PageNumber = ${pageNumber},
+          @PageSize = ${pageSize}
+      `);
 
-    return {
-      summary: result[0],
-      pendingUsers: result[1] || [],
-    };
+      // Convert BigInt to Number to avoid JSON serialization error
+      const summary = result[0] ? {
+        TotalUser: Number(result[0].TotalUser ?? 0),
+        TotalDitolak: Number(result[0].TotalDitolak ?? 0),
+        TotalAktif: Number(result[0].TotalAktif ?? 0),
+      } : null;
+
+      const pendingUsers = (result[1] || []).map((user: any) => ({
+        ...user,
+        TotalRows: user.TotalRows ? Number(user.TotalRows) : undefined,
+      }));
+
+      return {
+        summary,
+        pendingUsers,
+      };
+    } catch (error: any) {
+      logger.error('Failed to get pending users', { pageNumber, pageSize, error: error.message });
+      throw parseDatabaseError(error);
+    }
   }
 
-  /**
-   * Approve pending user
-   * SP: dbo.usp_ApproveUser
-   */
   async approveUser(userId: number, approverId: number) {
     try {
       await prisma.$queryRawUnsafe(`
@@ -96,17 +110,11 @@ export class PemerintahService {
 
       return { message: 'User berhasil disetujui' };
     } catch (error: any) {
-      if (error.message.includes('tidak ditemukan') || error.message.includes('tidak Pending')) {
-        throw new AppError(error.message, 400);
-      }
-      throw error;
+      logger.error('Failed to approve user', { userId, approverId, error: error.message });
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Reject pending user
-   * SP: dbo.usp_RejectUser
-   */
   async rejectUser(userId: number, approverId: number) {
     try {
       await prisma.$queryRawUnsafe(`
@@ -117,22 +125,26 @@ export class PemerintahService {
 
       return { message: 'User berhasil ditolak' };
     } catch (error: any) {
-      if (error.message.includes('tidak ditemukan') || error.message.includes('tidak Pending')) {
-        throw new AppError(error.message, 400);
-      }
-      throw error;
+      logger.error('Failed to reject user', { userId, approverId, error: error.message });
+      throw parseDatabaseError(error);
     }
   }
 
-  /**
-   * Get help requests (bantuan)
-   * SP: dbo.usp_GetPemerintahBantuan
-   */
   async getHelpRequests(pageNumber: number = 1) {
-    const result = await prisma.$queryRawUnsafe<any[]>(`
-      EXEC dbo.usp_GetPemerintahBantuan @PageNumber = ${pageNumber}
-    `);
+    try {
+      const result = await prisma.$queryRawUnsafe<any[]>(`
+        EXEC dbo.usp_GetPemerintahBantuan @PageNumber = ${pageNumber}
+      `);
 
-    return result;
+      // Convert BigInt to Number to avoid JSON serialization error
+      return (result || []).map((item: any) => ({
+        ...item,
+        No: item.No ? Number(item.No) : undefined,
+        TotalRows: item.TotalRows ? Number(item.TotalRows) : undefined,
+      }));
+    } catch (error: any) {
+      logger.error('Failed to get help requests', { pageNumber, error: error.message });
+      throw parseDatabaseError(error);
+    }
   }
 }
