@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react'
 import Sidebar from '@/components/distributor/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import { Search, ArrowUpDown, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import Link from 'next/link'
 import { api } from '@/lib/api'
 
 interface StokItem {
@@ -32,11 +31,33 @@ export default function ManajemenStokDistributorPage() {
   const [appliedTanggalOrder, setAppliedTanggalOrder] = useState<SortOrder>(null)
   const appliedSortBy = appliedJumlahOrder || appliedTanggalOrder ? 'jumlah' : null
 
+  // Add Stock modal
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [fertilizers, setFertilizers] = useState<{ pupukId: number; jenisPupuk: string }[]>([])
+  const [addPupukQuery, setAddPupukQuery] = useState('')
+  const [addPupukId, setAddPupukId] = useState<number | null>(null)
+  const [showPupukDropdown, setShowPupukDropdown] = useState(false)
+  const addPupukRef = useRef<HTMLDivElement>(null)
+  const [addJumlah, setAddJumlah] = useState('')
+  const [addingStock, setAddingStock] = useState(false)
+  const [addError, setAddError] = useState('')
+
+  // Edit Stock modal
+  const [editingStock, setEditingStock] = useState<StokItem | null>(null)
+  const [editJumlah, setEditJumlah] = useState('')
+  const [editDateText, setEditDateText] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState('')
+  const dateInputRef = useRef<HTMLInputElement>(null)
+
   const popupRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
         setShowSort(false)
+      }
+      if (addPupukRef.current && !addPupukRef.current.contains(e.target as Node)) {
+        setShowPupukDropdown(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -53,7 +74,12 @@ export default function ManajemenStokDistributorPage() {
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
+
   }, [])
+
+  const uniqueFertilizers = fertilizers.length > 0
+    ? fertilizers
+    : [...new Map(stokData.map(s => [s.pupukId, { pupukId: s.pupukId, jenisPupuk: s.jenisPupuk }])).values()]
 
   // Filter + sort (client-side)
   let filtered = stokData.filter(s =>
@@ -80,6 +106,30 @@ export default function ManajemenStokDistributorPage() {
   const pageSize = 10
   const totalPages = Math.ceil(filtered.length / pageSize)
   const displayed = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const parseDDMMYYYY = (s: string) => {
+    const parts = s.split('/')
+    if (parts.length !== 3) return null
+    const d = parseInt(parts[0], 10)
+    const m = parseInt(parts[1], 10) - 1
+    const y = parseInt(parts[2], 10)
+    if (isNaN(d) || isNaN(m) || isNaN(y)) return null
+    return new Date(y, m, d)
+  }
+
+  const formatToDDMMYYYY = (date: Date) => {
+    const dd = String(date.getDate()).padStart(2, '0')
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const yyyy = date.getFullYear()
+    return `${dd}/${mm}/${yyyy}`
+  }
+
+  const handleCalendarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value) {
+      const date = new Date(e.target.value + 'T00:00:00')
+      setEditDateText(formatToDDMMYYYY(date))
+    }
+  }
 
   const btnIconStyle = {
     width: 38, height: 38,
@@ -225,10 +275,16 @@ export default function ManajemenStokDistributorPage() {
                   )}
                 </div>
 
-                {/* + Tambah Pengiriman */}
-                <Link href="/distributor/tambah-pengiriman" style={{ ...btnIconStyle, textDecoration: 'none', color: 'inherit' }}>
+                {/* + Tambah Stok */}
+                <button onClick={() => {
+                  setAddPupukQuery('')
+                  setAddPupukId(null)
+                  setAddJumlah('')
+                  setAddError('')
+                  setShowAddModal(true)
+                }} style={btnIconStyle}>
                   <Plus size={16} color="#555" />
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -277,7 +333,14 @@ export default function ManajemenStokDistributorPage() {
                   <div style={{ textAlign: 'center' }}>
                     <button 
                       onClick={() => {
-                        console.log("Modal edit stok ID:", row.pupukId, "akan terbuka")
+                        const today = new Date()
+                        const dd = String(today.getDate()).padStart(2, '0')
+                        const mm = String(today.getMonth() + 1).padStart(2, '0')
+                        const yyyy = today.getFullYear()
+                        setEditingStock(row)
+                        setEditJumlah('')
+                        setEditDateText(`${dd}/${mm}/${yyyy}`)
+                        setEditError('')
                       }}
                       style={{ 
                         background: 'none', border: 'none', cursor: 'pointer',
@@ -310,6 +373,389 @@ export default function ManajemenStokDistributorPage() {
               <ChevronRight size={14} />
             </button>
           </div>
+
+          {/* ========== MODAL TAMBAH STOK ========== */}
+          {showAddModal && (
+            <div
+              onClick={() => {
+                setAddPupukQuery('')
+                setAddPupukId(null)
+                setAddJumlah('')
+                setAddError('')
+                setShowAddModal(false)
+              }}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 999,
+                background: 'rgba(0,0,0,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: 'white', borderRadius: '20px', padding: '36px 40px',
+                  width: '420px', maxWidth: '94vw', boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '22px', color: '#1a1a1a', margin: 0 }}>
+                    Tambah Stok
+                  </h2>
+                  <button onClick={() => {
+                    setAddPupukQuery('')
+                    setAddPupukId(null)
+                    setAddJumlah('')
+                    setAddError('')
+                    setShowAddModal(false)
+                  }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                    <X size={20} color="#888" />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div ref={addPupukRef} style={{ position: 'relative' }}>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a', marginBottom: '6px' }}>
+                      Jenis Pupuk
+                    </label>
+                    <input
+                      type="text"
+                      value={addPupukQuery}
+                      onChange={e => {
+                        setAddPupukQuery(e.target.value)
+                        setAddPupukId(null)
+                        setShowPupukDropdown(true)
+                      }}
+                      onFocus={() => setShowPupukDropdown(true)}
+                      placeholder="Ketik untuk cari atau tambah baru"
+                      style={{
+                        width: '100%', padding: '11px 14px', borderRadius: '10px',
+                        border: '1.5px solid #ddd', fontSize: '14px', fontFamily: 'var(--font-body)',
+                        outline: 'none',
+                      }}
+                    />
+
+                    {showPupukDropdown && (
+                      <div style={{
+                        position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+                        background: 'white', border: '1.5px solid #e5e5e5', borderRadius: '10px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)', maxHeight: '200px', overflowY: 'auto',
+                      }}>
+                        {(() => {
+                          const list = uniqueFertilizers
+                          const q = addPupukQuery.toLowerCase().trim()
+                          const filtered = q
+                            ? list.filter(f => f.jenisPupuk.toLowerCase().includes(q))
+                            : list
+
+                          return (
+                            <>
+                              {filtered.map(f => (
+                                <div
+                                  key={f.pupukId}
+                                  onClick={() => {
+                                    setAddPupukQuery(f.jenisPupuk)
+                                    setAddPupukId(f.pupukId)
+                                    setShowPupukDropdown(false)
+                                  }}
+                                  style={{
+                                    padding: '10px 14px', cursor: 'pointer', fontSize: '14px',
+                                    fontFamily: 'var(--font-body)', color: '#333',
+                                    borderBottom: '1px solid #f0f0f0',
+                                  }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = '#f5f9f5')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '')}
+                                >
+                                  {f.jenisPupuk}
+                                </div>
+                              ))}
+
+                              {q && !list.some(f => f.jenisPupuk.toLowerCase() === q) && (
+                                <div
+                                  onClick={() => {
+                                    setAddPupukQuery(q)
+                                    setAddPupukId(null)
+                                    setShowPupukDropdown(false)
+                                  }}
+                                  style={{
+                                    padding: '10px 14px', cursor: 'pointer', fontSize: '14px',
+                                    fontFamily: 'var(--font-body)', color: '#1e6b1e', fontWeight: 600,
+                                    borderTop: filtered.length > 0 ? '1px solid #e5e5e5' : 'none',
+                                  }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = '#f0f7f0')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '')}
+                                >
+                                  (+) Tambah "{q}" sebagai jenis baru
+                                </div>
+                              )}
+
+                              {!q && filtered.length === 0 && (
+                                <div style={{ padding: '10px 14px', fontSize: '14px', color: '#aaa' }}>
+                                  Tidak ada data pupuk
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a', marginBottom: '6px' }}>
+                      Jumlah Masuk (Ton)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={addJumlah}
+                      onChange={e => setAddJumlah(e.target.value)}
+                      placeholder="0"
+                      style={{
+                        width: '100%', padding: '11px 14px', borderRadius: '10px',
+                        border: '1.5px solid #ddd', fontSize: '14px', fontFamily: 'var(--font-body)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  {addError && (
+                    <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#FEE2E2', color: '#991B1B', fontSize: '13px' }}>
+                      {addError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                    <button
+                      onClick={() => {
+                        setAddPupukQuery('')
+                        setAddPupukId(null)
+                        setAddJumlah('')
+                        setAddError('')
+                        setShowAddModal(false)
+                      }}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #ddd',
+                        background: 'white', fontFamily: 'var(--font-display)', fontWeight: 600,
+                        fontSize: '14px', cursor: 'pointer',
+                      }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      disabled={addingStock || !addPupukQuery.trim() || !addJumlah || parseFloat(addJumlah) <= 0}
+                      onClick={async () => {
+                        setAddError('')
+                        const amount = parseFloat(addJumlah)
+                        if (!amount || amount <= 0) {
+                          setAddError('Jumlah harus lebih dari 0')
+                          return
+                        }
+                        setAddingStock(true)
+                        try {
+                          let pupukId = addPupukId
+                          // If no existing pupuk selected, create new one first
+                          if (!pupukId) {
+                            const createRes = await api.post<{ pupukId: number; jenisPupuk: string }>('/api/pupuk', {
+                              jenisPupuk: addPupukQuery.trim(),
+                            })
+                            pupukId = createRes.data!.pupukId
+                            // Add to local list so dropdown updates
+                            setFertilizers(prev => [...prev, { pupukId: pupukId!, jenisPupuk: addPupukQuery.trim() }])
+                          }
+                          await api.post('/api/stock', {
+                            pupukId,
+                            jumlah: amount,
+                          })
+                          setShowAddModal(false)
+                          setAddPupukQuery('')
+                          setAddPupukId(null)
+                          setAddJumlah('')
+                          // Refresh data
+                          const res = await api.get<{ totalStockTon: number; stockItems: StokItem[] }>('/api/distributor/stok')
+                          if (res.data) {
+                            setStokData(res.data.stockItems ?? [])
+                            setTotalTon(res.data.totalStockTon ?? 0)
+                          }
+                        } catch (err: any) {
+                          setAddError(err.message || 'Gagal menambah stok')
+                        } finally {
+                          setAddingStock(false)
+                        }
+                      }}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '10px', border: 'none',
+                        background: addingStock || !addPupukQuery.trim() || !addJumlah || parseFloat(addJumlah) <= 0 ? '#6B8F6B' : '#1e6b1e',
+                        color: 'white', fontFamily: 'var(--font-display)', fontWeight: 700,
+                        fontSize: '14px', cursor: addingStock || !addPupukQuery.trim() || !addJumlah || parseFloat(addJumlah) <= 0 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {addingStock ? 'Menyimpan...' : 'Simpan'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========== MODAL PERBARUI STOK ========== */}
+          {editingStock && (
+            <div
+              onClick={() => setEditingStock(null)}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 999,
+                background: 'rgba(0,0,0,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: 'white', borderRadius: '20px', padding: '36px 40px',
+                  width: '420px', maxWidth: '94vw', boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '22px', color: '#1a1a1a', margin: 0 }}>
+                    Perbarui Stok — {editingStock.jenisPupuk}
+                  </h2>
+                  <button onClick={() => setEditingStock(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                    <X size={20} color="#888" />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a', marginBottom: '6px' }}>
+                      Stok Saat Ini
+                    </label>
+                    <div style={{
+                      width: '100%', padding: '11px 14px', borderRadius: '10px',
+                      border: '1.5px solid #e5e5e5', fontSize: '14px', fontFamily: 'var(--font-body)',
+                      background: '#f5f5f5', color: '#555',
+                    }}>
+                      {editingStock.jumlah} Ton
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a', marginBottom: '6px' }}>
+                      Jumlah Penambahan (Ton)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editJumlah}
+                      onChange={e => setEditJumlah(e.target.value)}
+                      placeholder="0"
+                      style={{
+                        width: '100%', padding: '11px 14px', borderRadius: '10px',
+                        border: '1.5px solid #ddd', fontSize: '14px', fontFamily: 'var(--font-body)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a', marginBottom: '6px' }}>
+                      Waktu Diperbarui
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        value={editDateText}
+                        onChange={e => setEditDateText(e.target.value)}
+                        placeholder="DD/MM/YYYY"
+                        style={{
+                          width: '100%', padding: '11px 14px', borderRadius: '10px',
+                          border: '1.5px solid #ddd', fontSize: '14px', fontFamily: 'var(--font-body)',
+                          outline: 'none', paddingRight: '44px',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.click()}
+                        style={{
+                          position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                          background: 'none', border: 'none', cursor: 'pointer', display: 'flex',
+                          padding: '4px',
+                        }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                          <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                      </button>
+                      <input
+                        ref={dateInputRef}
+                        type="date"
+                        onChange={handleCalendarChange}
+                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                      />
+                    </div>
+                  </div>
+
+                  {editError && (
+                    <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#FEE2E2', color: '#991B1B', fontSize: '13px' }}>
+                      {editError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                    <button
+                      onClick={() => setEditingStock(null)}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #ddd',
+                        background: 'white', fontFamily: 'var(--font-display)', fontWeight: 600,
+                        fontSize: '14px', cursor: 'pointer',
+                      }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      disabled={savingEdit || !editJumlah}
+                      onClick={async () => {
+                        setEditError('')
+                        const jumlah = parseFloat(editJumlah)
+                        if (!jumlah || jumlah <= 0) {
+                          setEditError('Jumlah penambahan harus lebih dari 0')
+                          return
+                        }
+                        setSavingEdit(true)
+                        try {
+                          await api.post('/api/stock', {
+                            pupukId: editingStock.pupukId,
+                            jumlah: jumlah,
+                          })
+                          setEditingStock(null)
+                          // Refresh data
+                          const res = await api.get<{ totalStockTon: number; stockItems: StokItem[] }>('/api/distributor/stok')
+                          if (res.data) {
+                            setStokData(res.data.stockItems ?? [])
+                            setTotalTon(res.data.totalStockTon ?? 0)
+                          }
+                        } catch (err: any) {
+                          setEditError(err.message || 'Gagal memperbarui stok')
+                        } finally {
+                          setSavingEdit(false)
+                        }
+                      }}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '10px', border: 'none',
+                        background: savingEdit || !editJumlah ? '#6B8F6B' : '#1e6b1e',
+                        color: 'white', fontFamily: 'var(--font-display)', fontWeight: 700,
+                        fontSize: '14px', cursor: savingEdit || !editJumlah ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {savingEdit ? 'Menyimpan...' : 'Simpan'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
         </main>
       </div>

@@ -23,6 +23,7 @@ import petaniRoutes from './modules/petani/petani.routes';
 import redemptionRoutes from './modules/redemption/redemption.routes';
 import shipmentRoutes from './modules/shipment/shipment.routes';
 import stockRoutes from './modules/stock/stock.routes';
+import pupukRoutes from './modules/pupuk/pupuk.routes';
 
 const app: Application = express();
 
@@ -61,6 +62,7 @@ app.use('/api/petani', petaniRoutes);
 app.use('/api/redemption', redemptionRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/stock', stockRoutes);
+app.use('/api/pupuk', pupukRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

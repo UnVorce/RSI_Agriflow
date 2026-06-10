@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronLeft } from 'lucide-react'
 
 interface AuthLayoutProps {
@@ -45,21 +46,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           padding: '20px 32px',
         }}
       >
-        <Link
-          href="/"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            color: 'white',
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: '17px',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          <ChevronLeft size={20} strokeWidth={2.5} />
-          AgriFlow
+        <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <ChevronLeft size={20} strokeWidth={2.5} color="white" />
+          <Image src="/LogoPutih.png" alt="AgriFlow" width={130} height={38} style={{ objectFit: 'contain' }} />
         </Link>
       </nav>
 

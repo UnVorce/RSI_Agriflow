@@ -148,7 +148,7 @@ export class DistributorService {
           @UserIdPengecer = ${data.pengecerId},
           @PupukId = ${data.pupukId},
           @Jumlah = ${data.jumlah},
-          @TimestampKirim = ${data.timestamp || null}
+          @TimestampKirim = ${data.timestamp ?? new Date()}
       `;
 
       logger.info('Shipment created', {
@@ -246,7 +246,7 @@ export class DistributorService {
           @UserId = ${data.userId},
           @PupukId = ${data.pupukId},
           @JumlahPenyesuaian = ${data.jumlahPenyesuaian},
-          @Waktu = ${data.waktu || null}
+          @Waktu = ${data.waktu ?? new Date()}
       `;
 
       logger.info('Stock adjusted', { 
@@ -285,7 +285,7 @@ export class DistributorService {
           @UserId = ${data.userId},
           @PupukId = ${data.pupukId},
           @JumlahMasuk = ${data.jumlahMasuk},
-          @Waktu = ${data.waktu || null}
+          @Waktu = ${data.waktu ?? new Date()}
       `;
 
       logger.info('Stock added', { 
