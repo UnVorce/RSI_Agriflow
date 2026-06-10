@@ -1,5 +1,5 @@
-import { prisma } from '../../config/database';
-import { logger } from '../../utils/logger';
+import prisma from '../../config/database';
+import logger from '../../utils/logger';
 
 interface CreateBantuanInput {
   firstName: string;
@@ -32,25 +32,28 @@ export class BantuanService {
       const ringkasanEsc = escapeSQL(input.ringkasan);
       const userIdParam = input.userId != null ? `${input.userId}` : 'NULL';
 
-      // Execute stored procedure: dbo.usp_CreateBantuan
-      const result = await prisma.$queryRawUnsafe<any[]>(`
+      const idResult = await prisma.$queryRawUnsafe<{ NextId: number }[]>(
+        `SELECT ISNULL(MAX(BantuanId), 0) + 1 AS NextId FROM evt.BANTUAN`
+      );
+      const nextId = idResult[0].NextId;
+
+      await prisma.$executeRawUnsafe(`
         EXEC dbo.usp_CreateBantuan
-          @FirstName = '${firstNameEsc}',
-          @MiddleName = ${middleNameParam},
-          @LastName = ${lastNameParam},
-          @Email = '${emailEsc}',
-          @Topik = '${topikEsc}',
-          @Ringkasan = '${ringkasanEsc}',
-          @UserId = ${userIdParam}
+          ${nextId},
+          N'${firstNameEsc}',
+          ${middleNameParam},
+          ${lastNameParam},
+          N'${emailEsc}',
+          N'${topikEsc}',
+          N'${ringkasanEsc}',
+          ${userIdParam}
       `);
 
-      const bantuanResult = result[0];
-
-      logger.info(`Bantuan created: ${bantuanResult.BantuanId} by ${input.email}`);
+      logger.info(`Bantuan created: ${nextId} by ${input.email}`);
 
       return {
-        BantuanId: bantuanResult.BantuanId,
-        Pesan: bantuanResult.Pesan,
+        BantuanId: nextId,
+        Pesan: 'Laporan bantuan berhasil dikirim.',
         FirstName: input.firstName,
         Email: input.email,
         Topik: input.topik,

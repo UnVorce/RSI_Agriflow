@@ -84,7 +84,7 @@ export default function BantuanPage() {
 
       // Sukses → tampilkan state sukses sebentar lalu redirect
       setSuccess(true)
-      setTimeout(() => router.push('/'), 2500)
+      setTimeout(() => router.push('/'), 5000)
 
     } catch {
       // ERR-SYS-01: DB/network tidak merespons
@@ -123,29 +123,6 @@ export default function BantuanPage() {
     marginTop: '4px',
   }
 
-  if (success) {
-    return (
-      <AuthLayout>
-        <div style={{
-          textAlign: 'center',
-          padding: '64px 48px',
-          background: 'rgba(240,249,240,0.75)',
-          backdropFilter: 'blur(16px)',
-          borderRadius: '24px',
-          border: '1px solid rgba(255,255,255,0.4)',
-        }}>
-          <p style={{ fontSize: '48px', marginBottom: '16px' }}>✅</p>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '24px', color: '#1a1a1a', marginBottom: '8px' }}>
-            Laporan Terkirim!
-          </h2>
-          <p style={{ fontSize: '14px', color: '#555' }}>
-            Terima kasih. Tim kami akan segera meninjau laporanmu.
-          </p>
-        </div>
-      </AuthLayout>
-    )
-  }
-
   return (
     <AuthLayout>
       <div style={{
@@ -172,6 +149,21 @@ export default function BantuanPage() {
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+          {/* Success alert */}
+          {success && (
+            <div style={{ padding: '24px', borderRadius: '12px', color: '#065F46', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '20px', marginBottom: '8px' }}>
+                Laporan Terkirim!
+              </p>
+              <p style={{ fontSize: '14px' }}>
+                Terima kasih. Tim kami akan segera meninjau laporanmu.
+              </p>
+            </div>
+          )}
+
+          {!success && (
+            <>
 
           {/* Email + Nama */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -202,7 +194,7 @@ export default function BantuanPage() {
           </div>
 
           {/* Topik */}
-          <div style={{ maxWidth: '48%' }}>
+          <div>
             <label style={labelStyle}>Topik <span style={{ color: '#e53e3e' }}>*</span></label>
             <input
               name="topik"
@@ -237,41 +229,36 @@ export default function BantuanPage() {
 
           {/* General error */}
           {errors.general && (
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '10px',
-              background: 'rgba(229,62,62,0.08)',
-              border: '1px solid rgba(229,62,62,0.3)',
-              fontSize: '13px',
-              color: '#c53030',
-            }}>
+            <div style={{ padding: '12px', borderRadius: '8px', background: '#FEE2E2', color: '#991B1B', fontSize: '14px' }}>
               {errors.general}
             </div>
           )}
 
           {/* Submit */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              style={{
-                padding: '14px 40px',
-                borderRadius: '12px',
-                background: loading ? '#6aaa6a' : '#1e6b1e',
-                color: 'white',
-                fontFamily: 'var(--font-display)',
-                fontWeight: 700,
-                fontSize: '14px',
-                letterSpacing: '0.08em',
-                border: 'none',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'background 0.2s',
-              }}
-            >
-              {loading ? 'MENGIRIM...' : 'KIRIM'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '15px',
+              borderRadius: '12px',
+              background: loading ? '#6B8F6B' : '#1e6b1e',
+              color: 'white',
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
+              fontSize: '15px',
+              border: 'none',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              marginTop: '4px',
+              transition: 'background 0.2s',
+            }}
+          >
+            {loading ? 'MENGIRIM...' : 'KIRIM'}
+          </button>
+
+            </>
+          )}
 
         </div>
       </div>
