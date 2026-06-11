@@ -66,6 +66,8 @@ export class PengecerService {
         judul: r.JudulNotifikasi || r.Judul || '',
         pesan: r.PesanNotifikasi || r.Pesan || '',
         timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+        statusDibaca: Boolean(r.StatusDibaca),
+        jenis: r.Jenis || r.JenisNotifikasi || '',
       })),
       recentReceipts: (recentReceipts || []).map(r => ({
         kirimanId: String(r.kirimanId ?? ''),
@@ -132,6 +134,17 @@ export class PengecerService {
         ? `'${data.timestampDiterima.toISOString()}'`
         : 'NULL';
 
+      const shipment = await prisma.kirimanPupuk.findUnique({
+        where: { KirimanId: data.kirimanId },
+        include: { Pupuk: true },
+      });
+
+      if (!shipment) {
+        throw new AppError('Kiriman tidak ditemukan', 404);
+      }
+
+      const isMismatch = Number(shipment.JumlahDikirim) !== Number(data.jumlahDiterima);
+
       const result = await prisma.$queryRawUnsafe<any[]>(`
         EXEC dbo.usp_TerimaKirimanPengecer
           @UserIdPengecer = ${data.pengecerId},
@@ -139,6 +152,21 @@ export class PengecerService {
           @JumlahDiterima = ${data.jumlahDiterima},
           @TimestampDiterima = ${timestampParam}
       `);
+
+      if (isMismatch) {
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+          VALUES (
+            (SELECT ISNULL(MAX(NotifikasiId), 0) + 1 FROM evt.NOTIFIKASI WITH (TABLOCKX)),
+            'MISMATCH',
+            'Ketidaksesuaian Kiriman',
+            'Kiriman ${shipment.Pupuk.JenisPupuk} tidak sesuai. Dikirim: ${Number(shipment.JumlahDikirim)}, Diterima: ${data.jumlahDiterima}',
+            0,
+            ${shipment.UserIdDistributor},
+            GETDATE()
+          )
+        `);
+      }
 
       return result[0];
     } catch (error: any) {
@@ -322,6 +350,8 @@ export class PengecerService {
       judul: r.JudulNotifikasi || r.Judul || '',
       pesan: r.PesanNotifikasi || r.Pesan || '',
       timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+      statusDibaca: Boolean(r.StatusDibaca),
+      jenis: r.Jenis || r.JenisNotifikasi || '',
     }));
   }
 

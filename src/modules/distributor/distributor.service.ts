@@ -80,6 +80,8 @@ export class DistributorService {
           judul: r.JudulNotifikasi || r.Judul || '',
           pesan: r.PesanNotifikasi || r.Pesan || '',
           timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+          statusDibaca: Boolean(r.StatusDibaca),
+          jenis: r.Jenis || r.JenisNotifikasi || '',
         })),
       };
     } catch (error: any) {
@@ -444,6 +446,8 @@ export class DistributorService {
         judul: r.JudulNotifikasi || r.Judul || '',
         pesan: r.PesanNotifikasi || r.Pesan || '',
         timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+        statusDibaca: Boolean(r.StatusDibaca),
+        jenis: r.Jenis || r.JenisNotifikasi || '',
       }));
     } catch (error: any) {
       logger.error('Failed to get notifications', { userId, error: error.message });

@@ -63,10 +63,12 @@ export class DashboardService {
       })),
       notifications: notifications.map((n) => ({
         id: n.NotifikasiId,
+        notifikasiId: String(n.NotifikasiId),
         jenis: n.Jenis,
         judul: n.Judul,
         pesan: n.Pesan,
         timestamp: n.Timestamp,
+        statusDibaca: Boolean(n.StatusDibaca),
       })),
     };
   }
@@ -146,10 +148,12 @@ export class DashboardService {
       })),
       notifications: notifications.map((n) => ({
         id: n.NotifikasiId,
+        notifikasiId: String(n.NotifikasiId),
         jenis: n.Jenis,
         judul: n.Judul,
         pesan: n.Pesan,
         timestamp: n.Timestamp,
+        statusDibaca: Boolean(n.StatusDibaca),
       })),
     };
   }

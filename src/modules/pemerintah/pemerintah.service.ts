@@ -15,7 +15,14 @@ export class PemerintahService {
       EXEC dbo.usp_GetPemerintahNotifikasiTop3 @UserId = ${userId}
     `);
 
-    return result;
+    return (result || []).map(r => ({
+      notifikasiId: String(r.NotifikasiId ?? ''),
+      judul: r.JudulNotifikasi || r.Judul || '',
+      pesan: r.PesanNotifikasi || r.Pesan || '',
+      timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+      statusDibaca: Boolean(r.StatusDibaca),
+      jenis: r.Jenis || r.JenisNotifikasi || '',
+    }));
   }
 
   /**
