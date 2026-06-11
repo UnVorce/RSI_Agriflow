@@ -1,7 +1,7 @@
 {
   "name": "agriflow-backend",
   "version": "1.0.0",
-  "description": "AgriFlow - Fertilizer Subsidy Distribution Management System",
+  "description": "Backend AgriFlow - Sistem Distribusi Subsidi Pupuk",
   "main": "dist/server.js",
   "scripts": {
     "hash-passwords": "tsx scripts/hash-passwords.ts",

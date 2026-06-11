@@ -179,7 +179,7 @@ export class DistributorService {
    * Get stock dashboard with pagination
    * Composed from individual queries (avoiding multi-result-set SP limitation)
    */
-  async getStockDashboard(userId: number, pageNumber: number = 1) {
+  async getStockDashboard(userId: number, _pageNumber: number = 1) {
     try {
       const [totalRows, stockItems] = await Promise.all([
         prisma.$queryRaw<any[]>`
@@ -305,7 +305,7 @@ export class DistributorService {
    * Get shipment history with pagination
    * Composed from individual queries (avoiding multi-result-set SP limitation)
    */
-  async getShipmentHistory(userId: number, pageNumber: number = 1) {
+  async getShipmentHistory(userId: number, _pageNumber: number = 1) {
     try {
       const [summary, shipments] = await Promise.all([
         prisma.$queryRaw<any[]>`
@@ -364,7 +364,7 @@ export class DistributorService {
   /**
    * Get incoming stock history with pagination
    */
-  async getIncomingStockHistory(userId: number, pageNumber: number = 1) {
+  async getIncomingStockHistory(userId: number, _pageNumber: number = 1) {
     try {
       const rows = await prisma.$queryRaw<any[]>`
         SELECT
@@ -397,7 +397,7 @@ export class DistributorService {
   /**
    * Get outgoing stock history with pagination
    */
-  async getOutgoingStockHistory(userId: number, pageNumber: number = 1) {
+  async getOutgoingStockHistory(userId: number, _pageNumber: number = 1) {
     try {
       const rows = await prisma.$queryRaw<any[]>`
         SELECT

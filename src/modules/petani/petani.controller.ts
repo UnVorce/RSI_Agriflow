@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest as Request } from '../../common/middleware/auth.middleware';
 import { PetaniService } from './petani.service';
 
 export class PetaniController {

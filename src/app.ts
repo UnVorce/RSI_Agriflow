@@ -2,7 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
-import { errorHandler } from './common/middleware/error.middleware';
+import { errorHandler, AppError } from './common/middleware/error.middleware';
 import { apiRateLimiter } from './common/middleware/rate-limit.middleware';
 
 // Import routes
@@ -61,6 +61,12 @@ app.use('/api/petani', petaniRoutes);
 app.use('/api/redemption', redemptionRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/stock', stockRoutes);
+
+// 404 Handler
+app.use((req, _res, next) => {
+  const error = new AppError(`Rute tidak ditemukan: ${req.originalUrl}`, 404);
+  next(error);
+});
 
 // Error handler (must be last)
 app.use(errorHandler);

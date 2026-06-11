@@ -171,7 +171,7 @@ export class AnalyticsService {
     });
 
     // Group by distributor
-    const distributorData = new Map<string, number[]>();
+    const distributorData = new Map<number, number[]>();
     shipments.forEach((s) => {
       if (!distributorData.has(s.UserIdDistributor)) {
         distributorData.set(s.UserIdDistributor, []);

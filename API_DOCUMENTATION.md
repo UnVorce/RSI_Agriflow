@@ -1,59 +1,61 @@
-# AgriFlow API Documentation
+# 📖 Dokumentasi API AgriFlow
 
-Complete API reference for AgriFlow Backend.
+Ini daftar lengkap API untuk Backend AgriFlow. Kalo ada yang bingung atau nemu bug, langsung infoin aja ya!
 
-## Base URL
+## 🌍 Base URL
 
+Semua request ngarah ke sini ya:
 ```
 http://localhost:3000/api
 ```
 
-## Authentication
+## 🔐 Autentikasi
 
-Most endpoints require JWT authentication. Include the token in the Authorization header:
+Hampir semua endpoint butuh token JWT. Cara pakainya, masukin token lu di header `Authorization`:
 
 ```
-Authorization: Bearer YOUR_ACCESS_TOKEN
+Authorization: Bearer <TOKEN_LU_DISINI>
 ```
 
 ---
 
-## 📋 Table of Contents
+## 📋 Daftar Isi
 
-1. [Authentication](#authentication-endpoints)
-2. [Dashboard](#dashboard-endpoints)
-3. [Stock Management](#stock-management-endpoints)
-4. [Shipment](#shipment-endpoints)
-5. [Redemption](#redemption-endpoints)
-6. [Monitoring](#monitoring-endpoints)
-7. [Notifications](#notification-endpoints)
-8. [Landing Page](#landing-page-endpoints)
+1. [Auth & Login](#-1-auth--login)
+2. [Dashboard](#-2-dashboard)
+3. [Manajemen Stok](#-3-manajemen-stok)
+4. [Pengiriman (Shipment)](#-4-pengiriman-shipment)
+5. [Penebusan (Redemption)](#-5-penebusan-redemption)
+6. [Monitoring (Khusus Pemerintah)](#-6-monitoring-khusus-pemerintah)
+7. [Notifikasi & Komplain](#-7-notifikasi--komplain)
+8. [Landing Page (Public)](#-8-landing-page-public)
 
 ---
 
-## Authentication Endpoints
+## 🔑 1. Auth & Login
 
-### Register User
+### Register User Baru
+
+Endpoint ini buat user (Distributor/Pengecer) daftar. Formatnya `multipart/form-data` karena ada upload bukti.
 
 ```http
 POST /auth/register
-Content-Type: multipart/form-data
 ```
 
-**Body:**
-- `fullname` (string, required)
-- `email` (string, required)
-- `password` (string, required, min 8 chars)
-- `role` (string, required): "DISTRIBUTOR" or "PENGECER"
-- `proof` (file, required): JPG or PNG, max 5MB
+**Body Form-Data:**
+- `fullname` (string, wajib)
+- `email` (string, wajib)
+- `password` (string, wajib, minimal 8 karakter)
+- `role` (string, wajib): Pilih antara "DISTRIBUTOR" atau "PENGECER"
+- `proof` (file, wajib): Gambar JPG/PNG, ukuran max 5MB
 
-**Response:**
+**Contoh Response Sukses:**
 ```json
 {
-  "message": "Registrasi berhasil. Menunggu persetujuan.",
+  "message": "Registrasi berhasil. Menunggu persetujuan dari Dinas.",
   "data": {
-    "userId": "uuid",
-    "email": "user@example.com",
+    "userId": "123-abc-uuid",
+    "email": "contoh@email.com",
     "status": "Pending"
   }
 }
@@ -61,30 +63,32 @@ Content-Type: multipart/form-data
 
 ### Login
 
+Buat dapet token akses.
+
 ```http
 POST /auth/login
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
-  "email": "user@example.com",
+  "email": "contoh@email.com",
   "password": "password123"
 }
 ```
 
-**Response:**
+**Contoh Response Sukses:**
 ```json
 {
-  "message": "Login berhasil",
+  "message": "Mantap, login berhasil!",
   "data": {
-    "accessToken": "jwt_token",
-    "refreshToken": "jwt_refresh_token",
+    "accessToken": "ey...",
+    "refreshToken": "ey...",
     "user": {
-      "userId": "uuid",
-      "email": "user@example.com",
-      "name": "John Doe",
+      "userId": "123-abc",
+      "email": "contoh@email.com",
+      "name": "Budi Santoso",
       "role": "DISTRIBUTOR",
       "status": "Active"
     }
@@ -92,21 +96,27 @@ Content-Type: application/json
 }
 ```
 
-### Get Pending Users (Government Only)
+### Ambil Data User Pending (Khusus Pemerintah)
+
+Daftar user yang nunggu di-approve sama dinas.
 
 ```http
 GET /auth/pending
 Authorization: Bearer {token}
 ```
 
-### Approve User (Government Only)
+### Approve User (Khusus Pemerintah)
+
+Acc user yang baru daftar.
 
 ```http
 PATCH /auth/approve/:userId
 Authorization: Bearer {token}
 ```
 
-### Reject User (Government Only)
+### Reject User (Khusus Pemerintah)
+
+Tolak pendaftaran user.
 
 ```http
 PATCH /auth/reject/:userId
@@ -115,18 +125,18 @@ Authorization: Bearer {token}
 
 ---
 
-## Dashboard Endpoints
+## 📊 2. Dashboard
 
-### Get Dashboard (Role-Specific)
+### Ambil Data Dashboard
+
+Satu endpoint, tapi data yang dikeluarin beda-beda tergantung role lu apa.
 
 ```http
 GET /dashboard
 Authorization: Bearer {token}
 ```
 
-Returns different data based on user role:
-
-**Distributor Dashboard:**
+**Kalo lu Distributor:**
 ```json
 {
   "totalStock": 5000,
@@ -138,7 +148,7 @@ Returns different data based on user role:
 }
 ```
 
-**Retailer Dashboard:**
+**Kalo lu Pengecer:**
 ```json
 {
   "totalStock": 1000,
@@ -152,7 +162,7 @@ Returns different data based on user role:
 }
 ```
 
-**Government Dashboard:**
+**Kalo lu Pemerintah:**
 ```json
 {
   "userStats": [...],
@@ -170,20 +180,19 @@ Returns different data based on user role:
 
 ---
 
-## Stock Management Endpoints
+## 📦 3. Manajemen Stok
 
-### Get Stock
+### Cek Daftar Stok
 
 ```http
 GET /stock?pupukId={id}&search={query}
 Authorization: Bearer {token}
 ```
+**Parameter (opsional):**
+- `pupukId`: Filter berdasarkan ID pupuk
+- `search`: Cari nama pupuknya
 
-**Query Parameters:**
-- `pupukId` (optional): Filter by fertilizer ID
-- `search` (optional): Search fertilizer name
-
-### Add Stock
+### Tambah Stok Baru
 
 ```http
 POST /stock
@@ -191,7 +200,7 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
   "pupukId": 1,
@@ -199,7 +208,7 @@ Content-Type: application/json
 }
 ```
 
-### Update Stock (Distributor Only)
+### Update Stok Manual (Khusus Distributor)
 
 ```http
 PATCH /stock/:userId/:pupukId
@@ -207,14 +216,16 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
   "jumlah": 1500
 }
 ```
 
-### Get Stock History
+### Riwayat Stok
+
+Buat ngecek keluar masuk stok.
 
 ```http
 GET /stock/history?startDate={date}&endDate={date}&pupukId={id}
@@ -223,9 +234,11 @@ Authorization: Bearer {token}
 
 ---
 
-## Shipment Endpoints
+## 🚚 4. Pengiriman (Shipment)
 
-### Create Shipment (Distributor Only)
+### Bikin Pengiriman Baru (Khusus Distributor)
+
+Distributor kirim barang ke pengecer.
 
 ```http
 POST /shipments
@@ -233,23 +246,25 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
-  "retailerId": "uuid",
+  "retailerId": "id-pengecer-tujuan",
   "pupukId": 1,
   "jumlah": 500
 }
 ```
 
-### Get Shipment History
+### Riwayat Pengiriman
 
 ```http
 GET /shipments/history
 Authorization: Bearer {token}
 ```
 
-### Receive Shipment (Retailer Only)
+### Terima Pengiriman (Khusus Pengecer)
+
+Pengecer konfirmasi barang yang dikirim distributor udah sampe.
 
 ```http
 POST /shipments/receive
@@ -257,19 +272,21 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
-  "kirimanId": "uuid",
+  "kirimanId": "id-kirimannya",
   "jumlahDiterima": 500
 }
 ```
 
 ---
 
-## Redemption Endpoints
+## 🌾 5. Penebusan (Redemption)
 
-### Validate Farmer (Retailer Only)
+### Cek Validitas Petani (Khusus Pengecer)
+
+Cek sisa kuota petani pake NIK sebelum nebus.
 
 ```http
 POST /redemption/validate
@@ -277,24 +294,24 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
   "petaniId": "1234567890123456"
 }
 ```
 
-**Response:**
+**Contoh Response:**
 ```json
 {
-  "message": "Validasi petani berhasil",
+  "message": "Data petani ditemukan",
   "data": {
     "petani": {
       "petaniId": "1234567890123456",
-      "nama": "Farmer Name",
+      "nama": "Pak Tani",
       "nomorHp": "08123456789",
-      "alamat": "Full address",
-      "sektor": "Agriculture",
+      "alamat": "Desa Sukamaju",
+      "sektor": "Pertanian",
       "luasLahan": 2.5,
       "status": "Active"
     },
@@ -309,7 +326,9 @@ Content-Type: application/json
 }
 ```
 
-### Redeem Fertilizer (Retailer Only)
+### Proses Penebusan Pupuk (Khusus Pengecer)
+
+Kalo validasi aman, baru gas tebus.
 
 ```http
 POST /redemption
@@ -317,7 +336,7 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
   "petaniId": "1234567890123456",
@@ -326,7 +345,7 @@ Content-Type: application/json
 }
 ```
 
-### Get Redemption History (Retailer Only)
+### Riwayat Penebusan (Khusus Pengecer)
 
 ```http
 GET /redemption/history
@@ -335,50 +354,33 @@ Authorization: Bearer {token}
 
 ---
 
-## Monitoring Endpoints
+## 📈 6. Monitoring (Khusus Pemerintah)
 
-All monitoring endpoints require Government role.
+Pemerintah bisa liat keseluruhan data lewat sini.
 
-### Get Monitoring Data
+### Rekap Data Monitoring
 
 ```http
 GET /monitoring?province={name}&dateStart={date}&dateEnd={date}&fertilizer={name}
 Authorization: Bearer {token}
 ```
 
-**Query Parameters:**
-- `province` (optional): Filter by province name
-- `dateStart` (optional): Start date (YYYY-MM-DD)
-- `dateEnd` (optional): End date (YYYY-MM-DD)
-- `fertilizer` (optional): Filter by fertilizer name
+**Parameter (semua opsional):**
+- `province`: Filter nama provinsi
+- `dateStart`: Dari tanggal berapa (YYYY-MM-DD)
+- `dateEnd`: Sampai tanggal berapa (YYYY-MM-DD)
+- `fertilizer`: Nama pupuknya
 
-**Response:**
-```json
-{
-  "summary": {
-    "totalAbsorbed": 10000,
-    "topProvince": {
-      "province": "Jawa Barat",
-      "amount": 3000
-    },
-    "totalFarmers": 500,
-    "activeFarmers": 450,
-    "redemptionCount": 1000
-  },
-  "byProvince": [...],
-  "byFertilizer": [...],
-  "monthlyTrend": [...]
-}
-```
+### Deteksi Kejanggalan (Anomaly Detection)
 
-### Get Anomaly Detection
+Ngecek kalo ada indikasi penyelewengan.
 
 ```http
 GET /monitoring/anomaly
 Authorization: Bearer {token}
 ```
 
-**Response:**
+**Contoh Response:**
 ```json
 {
   "total": 25,
@@ -391,108 +393,92 @@ Authorization: Bearer {token}
     {
       "type": "SHIPMENT_MISMATCH",
       "severity": "HIGH",
-      "description": "Ketidaksesuaian kiriman: Dikirim 1000, Diterima 900",
+      "description": "Kiriman gak sinkron nih: Dikirim 1000, Diterima 900 doang",
       "details": {...},
       "timestamp": "2024-01-01T00:00:00Z"
     }
   ]
 }
 ```
+*Tipe anomali yang dideteksi:*
+- `SHIPMENT_MISMATCH`: Jumlah dikirim vs diterima beda
+- `LARGE_REDEMPTION`: Penebusan gede banget (>500kg)
+- `LOW_STOCK`: Stok tipis (≤50kg)
+- `LOW_QUOTA`: Kuota petani mau abis (≤10kg)
 
-**Anomaly Types:**
-- `SHIPMENT_MISMATCH`: Shipment quantity mismatch
-- `LARGE_REDEMPTION`: Unusually large redemption (>500kg)
-- `LOW_STOCK`: Stock below threshold (≤50kg)
-- `LOW_QUOTA`: Farmer quota near exhaustion (≤10kg)
-
-### Get Provinces
-
+### List Provinsi
 ```http
 GET /monitoring/provinces
 Authorization: Bearer {token}
 ```
 
-### Get Distribution Trends
-
+### Trend Distribusi
 ```http
 GET /monitoring/trends?months={number}
 Authorization: Bearer {token}
 ```
-
-**Query Parameters:**
-- `months` (optional, default: 12): Number of months to retrieve
+*Parameter:* `months` (default 12 bulan)
 
 ---
 
-## Notification Endpoints
+## 🔔 7. Notifikasi & Komplain
 
-### Get Notifications
-
+### Ambil List Notif
 ```http
 GET /notifications?unreadOnly={boolean}
 Authorization: Bearer {token}
 ```
 
-**Query Parameters:**
-- `unreadOnly` (optional): If true, returns only unread notifications
-
-### Get Unread Count
-
+### Hitung Notif Belum Dibaca
 ```http
 GET /notifications/unread-count
 Authorization: Bearer {token}
 ```
 
-### Mark as Read
-
+### Tandai Satu Notif Udah Dibaca
 ```http
 PATCH /notifications/:notificationId/read
 Authorization: Bearer {token}
 ```
 
-### Mark All as Read
-
+### Tandai Semua Notif Udah Dibaca
 ```http
 PATCH /notifications/mark-all-read
 Authorization: Bearer {token}
 ```
 
-### Delete Notification
-
+### Hapus Notif
 ```http
 DELETE /notifications/:notificationId
 Authorization: Bearer {token}
 ```
 
-### Submit Complaint
-
+### Kirim Komplain Baru
 ```http
 POST /notifications/complaints
 Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**Body:**
+**Body JSON:**
 ```json
 {
-  "firstName": "John",
-  "middleName": "Middle",
-  "lastName": "Doe",
-  "email": "john@example.com",
-  "topik": "Technical Issue",
-  "ringkasan": "Brief description (max 100 chars)"
+  "firstName": "Budi",
+  "middleName": "",
+  "lastName": "Santoso",
+  "email": "budi@example.com",
+  "topik": "Kendala Sistem",
+  "ringkasan": "Nggak bisa login dari kemaren nih min"
 }
 ```
 
-### Get All Complaints (Government Only)
-
+### Ambil Semua Komplain (Khusus Pemerintah)
 ```http
 GET /notifications/complaints
 Authorization: Bearer {token}
 ```
 
-### Get Complaint by ID (Government Only)
-
+### Detail Komplain (Khusus Pemerintah)
 ```http
 GET /notifications/complaints/:complaintId
 Authorization: Bearer {token}
@@ -500,126 +486,50 @@ Authorization: Bearer {token}
 
 ---
 
-## Landing Page Endpoints
+## 🌐 8. Landing Page (Public)
 
-Public endpoints (no authentication required).
+Endpoint ini gak butuh login/token. Biasa dipake buat nampilin data di halaman depan (Home).
 
-### Get Statistics
-
+### Statistik Global
 ```http
 GET /landing/stats
 ```
 
-**Response:**
-```json
-{
-  "totalFarmers": 500,
-  "distributedTon": 10.5,
-  "fertilizerCount": 6,
-  "mostPopularFertilizer": "Urea",
-  "activeDistributors": 10,
-  "activeRetailers": 50,
-  "totalShipments": 100,
-  "topProvinces": [...]
-}
-```
-
-### Get About Information
-
+### Info "Tentang Kami"
 ```http
 GET /landing/about
 ```
 
-**Response:**
-```json
-{
-  "name": "AgriFlow",
-  "description": "...",
-  "version": "1.0.0",
-  "features": [...],
-  "roles": [...],
-  "contact": {...}
-}
-```
-
-### Get Fertilizers
-
+### List Pupuk Tersedia
 ```http
 GET /landing/fertilizers
 ```
 
-**Response:**
-```json
-[
-  {
-    "pupukId": 1,
-    "jenisPupuk": "Urea",
-    "totalDistributed": 5000,
-    "availableStock": 2000,
-    "redemptionCount": 500
-  }
-]
-```
-
 ---
 
-## Error Responses
+## 🛑 Info Tambahan
 
-All endpoints may return error responses in this format:
-
+### Format Response Kalo Error
+Kalo ada error, response body-nya bakal selalu kayak gini (dalam Bahasa Indonesia biar gampang dimengerti):
 ```json
 {
-  "error": "Error message in Bahasa Indonesia"
+  "error": "Pesan errornya bakal muncul di sini"
 }
 ```
 
-### Common HTTP Status Codes
+### Daftar HTTP Status Codes yang Sering Kepake
+- `200 OK`: Aman bro, berhasil!
+- `201 Created`: Data baru berhasil disimpen
+- `400 Bad Request`: Data yang lo kirim gak valid/kurang lengkap
+- `401 Unauthorized`: Token lu salah, basi, atau lupa dimasukin
+- `403 Forbidden`: Lu gak punya akses buat buka halaman ini (beda role)
+- `404 Not Found`: Datanya nggak ada
+- `500 Internal Server Error`: Ada error di kodingan backend/database
 
-- `200 OK`: Success
-- `201 Created`: Resource created successfully
-- `400 Bad Request`: Invalid input
-- `401 Unauthorized`: Missing or invalid token
-- `403 Forbidden`: Insufficient permissions
-- `404 Not Found`: Resource not found
-- `500 Internal Server Error`: Server error
+### Rate Limiting & Pagination
+- Saat ini belum ada **rate limiting** (bebas hit). Ntar pas production mungkin bakal ditambahin.
+- Saat ini semua data di-load tanpa **pagination**. Nanti kita bakal update biar query-nya lebih enteng.
 
----
-
-## Rate Limiting
-
-Currently no rate limiting is implemented. Consider implementing rate limiting for production.
-
----
-
-## Pagination
-
-Currently no pagination is implemented. Large datasets return all results. Consider implementing pagination for production.
-
----
-
-## Swagger Documentation
-
-Interactive API documentation is available at:
-
-```
-http://localhost:3000/api-docs
-```
-
----
-
-## Postman Collection
-
-You can import the API into Postman using the Swagger/OpenAPI specification at:
-
-```
-http://localhost:3000/api-docs/swagger.json
-```
-
----
-
-## Support
-
-For issues or questions:
-- Check the Swagger documentation
-- Review error messages (in Bahasa Indonesia)
-- Check application logs in `logs/` directory
+### Butuh Testing Cepat?
+Langsung buka aja Swagger UI di:
+👉 `http://localhost:3000/api-docs`

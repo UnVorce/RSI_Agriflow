@@ -1,84 +1,88 @@
-# AgriFlow Backend
+# AgriFlow Backend 🚜
 
-Backend API untuk sistem distribusi subsidi pupuk.
+Halo! Ini adalah repository buat backend API AgriFlow, sistem untuk ngurusin distribusi subsidi pupuk biar lebih rapi dan transparan.
 
-## Tech Stack
+## 🛠️ Tech Stack yang Dipakai
 
-- Node.js + TypeScript + Express
-- SQL Server + Prisma ORM  
-- Redis (optional)
-- JWT Authentication
-- Zod Validation
+Kita pakai stack standar biar gampang di-maintain:
+- **Node.js + TypeScript + Express** (Classic combo!)
+- **SQL Server + Prisma ORM** (Buat database kita)
+- **Redis** (Opsional sih, tapi lumayan buat caching)
+- **JWT Authentication** (Buat login-loginan)
+- **Zod Validation** (Biar inputnya aman)
 
-## Setup
+## 🚀 Cara Jalanin (Quick Setup)
 
-### 1. Install Dependencies
+Kalo mau setup cepet, ikutin langkah ini ya:
+
+1. **Install dependencies dulu**
+   ```bash
+   npm install
+   ```
+
+2. **Siapin environment variables**
+   Copy aja dari example:
+   ```bash
+   copy .env.example .env
+   ```
+   Trus buka `.env` dan sesuain `DATABASE_URL`-nya, contoh:
+   ```env
+   DATABASE_URL="sqlserver://localhost:1433;database=AgriFlowDB;integratedSecurity=true;trustServerCertificate=true"
+   ```
+
+3. **Generate Prisma Client**
+   Biar TypeScript-nya nggak error pas query:
+   ```bash
+   npm run prisma:generate
+   ```
+
+4. **Gasss, nyalain servernya!**
+   ```bash
+   npm run dev
+   ```
+   Udah deh! Servernya jalan di `http://localhost:3000`. 
+   Kalo mau liat dokumentasi API (Swagger), bisa buka `http://localhost:3000/api-docs`.
+
+## 📜 Daftar Command Bawaan
+
+Beberapa command yang sering dipakai:
 ```bash
-npm install
+npm run dev          # Jalanin mode development
+npm run build        # Nge-build ke production (di compile ke JS)
+npm start            # Jalanin hasil build production
+npm test             # Buat ngejalanin testing
+npm run prisma:studio # Buka GUI database buat liat/edit data langsung
 ```
 
-### 2. Configure Environment
-```bash
-copy .env.example .env
-```
+## 🗺️ Struktur API
 
-Edit `.env`:
-```env
-DATABASE_URL="sqlserver://localhost:1433;database=AgriFlowDB;integratedSecurity=true;trustServerCertificate=true"
-```
+Pembagian route-nya kita bikin per-role biar ga pusing:
+- `/api/auth/*` 👉 Buat urusan login & register
+- `/api/pemerintah/*` 👉 Khusus endpoint orang dinas/pemerintah
+- `/api/distributor/*` 👉 Fitur-fitur buat distributor
+- `/api/pengecer/*` 👉 Fitur-fitur buat pengecer/kios
 
-### 3. Generate Prisma Client
-```bash
-npm run prisma:generate
-```
+## 🗄️ Arsitektur Database
 
-### 4. Start Server
-```bash
-npm run dev
-```
+Kita bagi jadi 4 schema utama biar rapi:
+- `ref`: Data referensi (role, lokasi, jenis pupuk, dll)
+- `master`: Data inti (user, petani, distributor)
+- `trans`: Transaksi berjalan (kiriman, penebusan, stok)
+- `evt`: Event (notifikasi, log aktivitas)
 
-API: http://localhost:3000  
-Docs: http://localhost:3000/api-docs
+## ⚡ Performance Goal
 
-## Scripts
-
-```bash
-npm run dev          # Development
-npm run build        # Build production
-npm start            # Start production
-npm test             # Run tests
-npm run prisma:studio # Database GUI
-```
-
-## API Structure
-
-```
-/api/auth/*         - Authentication
-/api/pemerintah/*   - Government endpoints
-/api/distributor/*  - Distributor endpoints  
-/api/pengecer/*     - Retailer endpoints
-```
-
-## Database Architecture
-
-4 schemas:
-- `ref` - Reference data (roles, locations, products)
-- `master` - Master data (users, farmers, distributors)
-- `trans` - Transactions (shipments, redemptions, stock)
-- `evt` - Events (notifications, logs)
-
-## Performance
-
-Optimized for 2M+ rows:
-- ✅ Pagination (max 100/request)
-- ✅ Database indexes
-- ✅ Redis caching
+Karena datanya bakal gede (bisa >2 juta baris), kita udah optimasi pakai:
+- ✅ Pagination (dibatasi max 100 data per request)
+- ✅ Database indexes (biar query wus-wus)
+- ✅ Redis caching (buat data yang jarang berubah)
 - ✅ Connection pooling
 
-Target: < 500ms response time
+Target utamanya: response time harus di bawah **500ms**!
 
-## Documentation
+## 📚 Mau Baca Lebih Lanjut?
 
-- `SETUP.md` - Detailed setup guide
-- `API_DOCUMENTATION.md` - API reference
-- `/api-docs` - Swagger UI
+Cek file-file ini kalo butuh info lebih detail:
+- `SETUP.md` 👉 Buat guide setup yang lebih lengkap & troubleshooting
+- `API_DOCUMENTATION.md` 👉 Referensi endpoint manual
+- `/api-docs` 👉 Langsung test API via Swagger UI

@@ -155,9 +155,9 @@ export class PengecerService {
    */
   async getStockDashboard(
     userId: number,
-    pageNumber: number = 1,
-    sortColumn: 'JumlahStok' | 'LastUpdated' = 'LastUpdated',
-    sortDirection: 'ASC' | 'DESC' = 'DESC'
+    _pageNumber: number = 1,
+    _sortColumn: 'JumlahStok' | 'LastUpdated' = 'LastUpdated',
+    _sortDirection: 'ASC' | 'DESC' = 'DESC'
   ) {
     const [totalRows, stockItems] = await Promise.all([
       prisma.$queryRaw<any[]>`
@@ -219,7 +219,7 @@ export class PengecerService {
   /**
    * Get receipt history (incoming stock)
    */
-  async getReceiptHistory(userId: number, pageNumber: number = 1) {
+  async getReceiptHistory(userId: number, _pageNumber: number = 1) {
     const [summary, receipts] = await Promise.all([
       prisma.$queryRaw<any[]>`
         SELECT
@@ -264,7 +264,7 @@ export class PengecerService {
   /**
    * Get redemption history
    */
-  async getRedemptionHistory(userId: number, pageNumber: number = 1) {
+  async getRedemptionHistory(userId: number, _pageNumber: number = 1) {
     const [summary, redemptions] = await Promise.all([
       prisma.$queryRaw<any[]>`
         SELECT

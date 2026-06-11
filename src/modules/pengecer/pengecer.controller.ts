@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
+import { AuthRequest as Request } from '../../common/middleware/auth.middleware';
 import { PengecerService } from './pengecer.service';
 
 const service = new PengecerService();
@@ -11,7 +12,7 @@ export class PengecerController {
   async getDashboard(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const data = await service.getDashboard(userId);
       res.json({ success: true, data });
     } catch (error) {
@@ -26,7 +27,7 @@ export class PengecerController {
   async getRecentReceipts(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const data = await service.getRecentReceipts(userId);
       res.json({ success: true, data });
     } catch (error) {
@@ -41,7 +42,7 @@ export class PengecerController {
   async getReceiptHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const pageNumber = parseInt(req.query.page as string) || 1;
       const data = await service.getReceiptHistory(userId, pageNumber);
       res.json({ success: true, data });
@@ -57,9 +58,9 @@ export class PengecerController {
   async validateShipment(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const kirimanId = Number(req.params.kirimanId);
-      if (isNaN(kirimanId)) return res.status(400).json({ success: false, message: 'kirimanId tidak valid' });
+      if (isNaN(kirimanId)) { res.status(400).json({ success: false, message: 'kirimanId tidak valid' }); return; }
       const data = await service.validateShipment(userId, kirimanId);
       res.json({ success: true, data });
     } catch (error) {
@@ -74,10 +75,10 @@ export class PengecerController {
   async receiveShipment(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const { kirimanId, jumlahDiterima, timestampDiterima } = req.body;
       const numKirimanId = Number(kirimanId);
-      if (isNaN(numKirimanId)) return res.status(400).json({ success: false, message: 'kirimanId tidak valid' });
+      if (isNaN(numKirimanId)) { res.status(400).json({ success: false, message: 'kirimanId tidak valid' }); return; }
 
       const data = await service.receiveShipment({
         pengecerId: userId,
@@ -99,7 +100,7 @@ export class PengecerController {
   async getStockDashboard(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const pageNumber = parseInt(req.query.page as string) || 1;
       const sortColumn = (req.query.sortColumn as 'JumlahStok' | 'LastUpdated') || 'LastUpdated';
       const sortDirection = (req.query.sortDirection as 'ASC' | 'DESC') || 'DESC';
@@ -118,10 +119,10 @@ export class PengecerController {
   async addStock(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const { pupukId, jumlahMasuk, waktu } = req.body;
       const numPupukId = Number(pupukId);
-      if (isNaN(numPupukId)) return res.status(400).json({ success: false, message: 'pupukId tidak valid' });
+      if (isNaN(numPupukId)) { res.status(400).json({ success: false, message: 'pupukId tidak valid' }); return; }
 
       const data = await service.addStock({
         userId,
@@ -143,7 +144,7 @@ export class PengecerController {
   async getRedemptionHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const pageNumber = parseInt(req.query.page as string) || 1;
       const data = await service.getRedemptionHistory(userId, pageNumber);
       res.json({ success: true, data });
@@ -159,7 +160,7 @@ export class PengecerController {
   async validatePetani(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const { petaniId } = req.params;
       const data = await service.validatePetani(userId, petaniId);
       res.json({ success: true, data });
@@ -175,10 +176,10 @@ export class PengecerController {
   async createRedemption(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const { petaniId, pupukId, jumlah } = req.body;
       const numPupukId = Number(pupukId);
-      if (isNaN(numPupukId)) return res.status(400).json({ success: false, message: 'pupukId tidak valid' });
+      if (isNaN(numPupukId)) { res.status(400).json({ success: false, message: 'pupukId tidak valid' }); return; }
 
       const data = await service.createRedemption({
         pengecerId: userId,
@@ -200,7 +201,7 @@ export class PengecerController {
   async getNotifications(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const pageNumber = parseInt(req.query.page as string) || 1;
       const data = await service.getNotifications(userId, pageNumber);
       res.json({ success: true, data });
@@ -216,9 +217,9 @@ export class PengecerController {
   async markNotificationRead(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const notifikasiId = Number(req.params.notifikasiId);
-      if (isNaN(notifikasiId)) return res.status(400).json({ success: false, message: 'notifikasiId tidak valid' });
+      if (isNaN(notifikasiId)) { res.status(400).json({ success: false, message: 'notifikasiId tidak valid' }); return; }
       const data = await service.markNotificationRead(notifikasiId, userId);
       res.json({ success: true, data });
     } catch (error) {

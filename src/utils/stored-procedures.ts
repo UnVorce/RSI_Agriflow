@@ -1,5 +1,5 @@
 import prisma from '../config/database';
-import { Prisma } from '@prisma/client';
+
 
 /**
  * Utility class to execute stored procedures

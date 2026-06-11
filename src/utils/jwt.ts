@@ -2,7 +2,7 @@ import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
 import { config } from '../config/env';
 
 export interface JwtPayload {
-  userId: string;
+  userId: number;
   email: string;
   role: string;
 }

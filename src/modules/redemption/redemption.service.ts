@@ -33,7 +33,7 @@ export class RedemptionService {
     }
 
     const now = new Date();
-    if (now < farmer.AwalTerdaftar || now > farmer.AkhirTerdaftar) {
+    if (now < farmer.AwalTerdaftar || (farmer.AkhirTerdaftar && now > farmer.AkhirTerdaftar)) {
       throw new AppError('Periode registrasi petani tidak valid', 400);
     }
 
@@ -82,7 +82,7 @@ export class RedemptionService {
     }
 
     const now = new Date();
-    if (now < farmer.AwalTerdaftar || now > farmer.AkhirTerdaftar) {
+    if (now < farmer.AwalTerdaftar || (farmer.AkhirTerdaftar && now > farmer.AkhirTerdaftar)) {
       throw new AppError('Periode registrasi petani tidak valid', 400);
     }
 

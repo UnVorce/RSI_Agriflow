@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { BantuanController } from './bantuan.controller';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { requireRole } from '../../common/middleware/role.middleware';
+
+import { validate } from '../../common/validators/validate';
+import { createBantuanSchema } from '../../common/validators/bantuan.validator';
 
 const router = Router();
 const bantuanController = new BantuanController();
@@ -37,7 +39,7 @@ const bantuanController = new BantuanController();
  *               ringkasan:
  *                 type: string
  */
-router.post('/', bantuanController.submitBantuan);
+router.post('/', validate(createBantuanSchema), bantuanController.submitBantuan);
 
 /**
  * @swagger

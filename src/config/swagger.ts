@@ -7,14 +7,14 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: 'AgriFlow API',
       version: '1.0.0',
-      description: 'API Documentation for AgriFlow - Fertilizer Subsidy Distribution Management System',
+      description: 'Dokumentasi API buat AgriFlow - Sistem Manajemen Distribusi Subsidi Pupuk',
       contact: {
-        name: 'AgriFlow Team',
+        name: 'Tim AgriFlow',
       },
     },
     servers: [
       {
-        url: `http://localhost:${config.port}`,
+        url: `http://localhost:${config.port}/api`,
         description: 'Development server',
       },
     ],

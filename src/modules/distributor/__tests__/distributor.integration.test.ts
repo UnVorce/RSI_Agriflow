@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../../../app';
 import prisma from '../../../config/database';
-import { AppError } from '../../../common/middleware/error.middleware';
 import { vi } from 'vitest';
 
 vi.mock('../../../config/redis', () => {
@@ -10,7 +9,7 @@ vi.mock('../../../config/redis', () => {
   return {
     default: {
       get: vi.fn(async (key) => store[key] || null),
-      setEx: vi.fn(async (key, ttl, val) => { store[key] = val; }),
+      setEx: vi.fn(async (key, _ttl, val) => { store[key] = val; }),
       ttl: vi.fn().mockResolvedValue(60),
       del: vi.fn(async (key) => { delete store[key]; }),
     }
@@ -60,8 +59,8 @@ describe('Distributor Integration Tests', () => {
 
   beforeAll(async () => {
     // Setup: Create test users and get auth token
-    const roleDist = await prisma.role.findFirst({ where: { RoleName: 'DISTRIBUTOR' } }) || await prisma.role.create({ data: { RoleName: 'DISTRIBUTOR', RoleDescription: '' } });
-    const rolePeng = await prisma.role.findFirst({ where: { RoleName: 'PENGECER' } }) || await prisma.role.create({ data: { RoleName: 'PENGECER', RoleDescription: '' } });
+    const roleDist = await prisma.role.findFirst({ where: { RoleName: 'DISTRIBUTOR' } }) || await prisma.role.create({ data: { RoleId: 'role-dist-' + Date.now(), RoleName: 'DISTRIBUTOR', RoleDescription: '' } } as any);
+    const rolePeng = await prisma.role.findFirst({ where: { RoleName: 'PENGECER' } }) || await prisma.role.create({ data: { RoleId: 'role-peng-' + Date.now(), RoleName: 'PENGECER', RoleDescription: '' } } as any);
 
     distributorUserId = Math.floor(Math.random() * 1000000) + 100000;
     pengecerUserId = Math.floor(Math.random() * 1000000) + 100000;
@@ -91,7 +90,7 @@ describe('Distributor Integration Tests', () => {
     });
 
     authToken = generateAccessToken({
-      userId: distributorUserId.toString(),
+      userId: distributorUserId,
       email: `int-dist-${Date.now()}@example.com`,
       role: 'DISTRIBUTOR'
     });

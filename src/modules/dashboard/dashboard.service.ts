@@ -1,10 +1,7 @@
 import prisma from '../../config/database';
 import { Decimal } from '@prisma/client/runtime/library';
 
-function esc(val: string | null | undefined): string {
-  if (val == null) return 'NULL';
-  return `'${val.replace(/'/g, "''")}'`;
-}
+
 
 export class DashboardService {
   async getDistributorDashboard(userId: number) {

@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
+import { AuthRequest as Request } from '../../common/middleware/auth.middleware';
 import { PemerintahService } from './pemerintah.service';
 
 const service = new PemerintahService();
@@ -11,7 +12,7 @@ export class PemerintahController {
   async getTopNotifications(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const data = await service.getTopNotifications(userId);
       res.json({ success: true, data });
     } catch (error) {
@@ -50,7 +51,7 @@ export class PemerintahController {
   async getAnomalies(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = Number(req.user?.userId);
-      if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(userId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const pageNumber = parseInt(req.query.page as string) || 1;
       const data = await service.getAnomalies(userId, pageNumber);
       res.json({ success: true, data });
@@ -81,9 +82,9 @@ export class PemerintahController {
   async approveUser(req: Request, res: Response, next: NextFunction) {
     try {
       const approverId = Number(req.user?.userId);
-      if (isNaN(approverId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(approverId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const userId = Number(req.params.userId);
-      if (isNaN(userId)) return res.status(400).json({ success: false, message: 'userId tidak valid' });
+      if (isNaN(userId)) { res.status(400).json({ success: false, message: 'userId tidak valid' }); return; }
       const data = await service.approveUser(userId, approverId);
       res.json({ success: true, data });
     } catch (error) {
@@ -98,9 +99,9 @@ export class PemerintahController {
   async rejectUser(req: Request, res: Response, next: NextFunction) {
     try {
       const approverId = Number(req.user?.userId);
-      if (isNaN(approverId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (isNaN(approverId)) { res.status(401).json({ success: false, message: 'Unauthorized' }); return; }
       const userId = Number(req.params.userId);
-      if (isNaN(userId)) return res.status(400).json({ success: false, message: 'userId tidak valid' });
+      if (isNaN(userId)) { res.status(400).json({ success: false, message: 'userId tidak valid' }); return; }
       const data = await service.rejectUser(userId, approverId);
       res.json({ success: true, data });
     } catch (error) {
