@@ -20,11 +20,11 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const target = user.role === 'DISTRIBUTOR'
-        ? '/distributor/dashboard'
-        : user.role === 'PENGECER'
-          ? '/pengecer/dashboard'
-          : '/'
+      const target =
+        user.role === 'DISTRIBUTOR' ? '/distributor/dashboard' :
+        user.role === 'PENGECER'    ? '/pengecer/dashboard' :
+        user.role === 'PEMERINTAH'  ? '/pemerintah/dashboard' :
+        '/'
       router.replace(target)
     }
   }, [user, router])
