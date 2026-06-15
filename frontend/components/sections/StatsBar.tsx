@@ -20,7 +20,7 @@ async function getStats(): Promise<StatsData> {
 
 const fallbackStats = [
   { icon: <Users size={36} strokeWidth={1.5} />, value: '12k+',       label: 'Petani Terdaftar' },
-  { icon: <Truck size={36} strokeWidth={1.5} />, value: '500 ton',    label: 'Pupuk Disalurkan' },
+  { icon: <Truck size={36} strokeWidth={1.5} />, value: '500 kg',    label: 'Pupuk Disalurkan' },
   { icon: <Package size={36} strokeWidth={1.5} />, value: '50+',       label: 'Jenis Pupuk' },
 ]
 
@@ -36,7 +36,7 @@ export default async function StatsBar() {
   const stats = hasData
     ? [
         { icon: <Users size={36} strokeWidth={1.5} />, value: fmt(statsData.totalFarmers), label: 'Petani Terdaftar' },
-        { icon: <Truck size={36} strokeWidth={1.5} />, value: `${statsData.distributedTon} ton`, label: 'Pupuk Disalurkan' },
+        { icon: <Truck size={36} strokeWidth={1.5} />, value: statsData.distributedTon >= 1000 ? `${(statsData.distributedTon / 1000).toFixed(2)} Ton` : `${statsData.distributedTon.toFixed(2)} kg`, label: 'Pupuk Disalurkan' },
         { icon: <Package size={36} strokeWidth={1.5} />, value: fmt(statsData.fertilizerCount), label: 'Jenis Pupuk' },
       ]
     : fallbackStats

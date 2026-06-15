@@ -9,6 +9,7 @@ const controller = new PupukController();
 router.use(authenticate);
 router.use(requireRole('DISTRIBUTOR'));
 
+router.get('/', controller.getAllPupuk.bind(controller));
 router.post('/', controller.createPupuk.bind(controller));
 
 export default router;

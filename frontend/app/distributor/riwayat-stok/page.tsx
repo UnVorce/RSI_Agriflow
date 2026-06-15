@@ -5,6 +5,7 @@ import Sidebar from '@/components/distributor/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
 import { api } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface RiwayatItem {
   riwayatId: string
@@ -81,7 +82,7 @@ export default function RiwayatStokPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb' }}>
-      <Sidebar notifCount={5} />
+      <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <TopBar />
@@ -195,7 +196,7 @@ export default function RiwayatStokPage() {
                   <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{row.riwayatId?.slice(0, 8) || '-'}</span>
                   <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jenisPupuk}</span>
                   <span style={{ fontSize: '15px', color: '#1e6b1e', textAlign: 'center', fontWeight: 600 }}>
-                    {row.jumlahAkhir} Ton
+                    {formatStock(row.jumlahAkhir)}
                   </span>
                   <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>
                     {row.timestamp ? new Date(row.timestamp).toLocaleDateString('id-ID') : '-'}

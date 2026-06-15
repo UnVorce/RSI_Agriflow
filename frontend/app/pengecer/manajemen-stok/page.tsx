@@ -6,6 +6,7 @@ import TopBar from '@/components/layout/TopBar'
 import { Search, ArrowUpDown, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface StokItem {
   pupukId: number
@@ -277,7 +278,7 @@ export default function ManajemenStokPage() {
                 }}>
                   <span style={{ fontSize: '15px', color: '#333', textAlign: 'center', fontWeight: 500 }}>{row.pupukId}</span>
                   <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jenisPupuk}</span>
-                  <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jumlahStok}</span>
+                  <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{formatStock(row.jumlahStok)}</span>
                   <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.lastUpdated ? new Date(row.lastUpdated).toLocaleDateString('id-ID') : '-'}</span>
                   <div style={{ textAlign: 'center' }}>
                     <Link href={`/pengecer/manajemen-stok/${row.pupukId}`} style={{ fontSize: '14px', color: '#1e6b1e', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '3px' }}>

@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { AnyZodObject, ZodError } from 'zod';
-import { AppError } from './error.middleware';
 
 /**
  * Validation middleware using Zod schemas
@@ -11,9 +10,8 @@ export const validateRequest = (
   schema: AnyZodObject,
   source: 'body' | 'query' | 'params' = 'body'
 ) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Parse and validate data
       const data = source === 'body' 
         ? req.body 
         : source === 'query'
@@ -22,7 +20,6 @@ export const validateRequest = (
 
       const validated = await schema.parseAsync(data);
       
-      // Replace request data with validated data
       if (source === 'body') {
         req.body = validated;
       } else if (source === 'query') {
@@ -40,7 +37,7 @@ export const validateRequest = (
           code: err.code
         }));
 
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
@@ -49,6 +46,7 @@ export const validateRequest = (
             timestamp: new Date().toISOString()
           }
         });
+        return;
       }
       next(error);
     }
@@ -89,12 +87,12 @@ function parseQueryParams(query: any): any {
  * Validate UUID parameter
  */
 export const validateUUID = (paramName: string) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const value = req.params[paramName];
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     
     if (!uuidRegex.test(value)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: {
           code: 'INVALID_UUID',
@@ -102,6 +100,7 @@ export const validateUUID = (paramName: string) => {
           timestamp: new Date().toISOString()
         }
       });
+      return;
     }
     
     next();

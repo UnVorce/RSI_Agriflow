@@ -2,6 +2,19 @@ import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
 
 export class PupukService {
+  async getAllPupuk() {
+    const rows = await prisma.pupuk.findMany({
+      select: {
+        PupukId: true,
+        JenisPupuk: true,
+      },
+      orderBy: {
+        JenisPupuk: 'asc',
+      },
+    });
+    return rows.map(r => ({ pupukId: r.PupukId, jenisPupuk: r.JenisPupuk }));
+  }
+
   async createPupuk(jenisPupuk: string) {
     const name = jenisPupuk.trim()
     if (!name) throw new AppError('Nama pupuk tidak boleh kosong', 400);

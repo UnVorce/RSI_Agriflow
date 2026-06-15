@@ -6,6 +6,7 @@ import { CheckCircle2, Calendar } from 'lucide-react'
 import Sidebar from '@/components/pengecer/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 import { api, ApiError } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 const jenisPupukOptions = ['Urea', 'Kompos', 'NPK', 'SP-36', 'NPK Formulasi Khusus', 'Organik', 'Kimia']
 
@@ -66,9 +67,10 @@ export default function TerimaStokPage() {
       const res = await api.get<any>(`/api/pengecer/validasi-kiriman/${id}`)
       if (res.data) {
         const d = res.data
-        setPengiriman({ jenis: d.JenisPupuk || d.jenisPupuk || '', jumlah: d.JumlahDikirim ?? d.jumlahDikirim ?? 0, waktu: d.TimestampDikirim || d.timestampDikirim || '' })
+        const jenisPupuk = d.JenisPupuk || d.jenisPupuk || ''
+        setPengiriman({ jenis: jenisPupuk, jumlah: d.JumlahDikirim ?? d.jumlahDikirim ?? 0, waktu: d.TimestampDikirim || d.timestampDikirim || '' })
         setIdKonfirm(id)
-        setJenis(''); setJumlah(''); setWaktu('')
+        setJenis(jenisPupuk); setJenisSearch(''); setJumlah(''); setWaktu('')
         setStep(2)
       }
     } catch (err) {
@@ -85,19 +87,20 @@ export default function TerimaStokPage() {
     setKirimError('')
     try {
       const [dd, mm, yyyy] = waktu.split('/')
-      const timestampDiterima = `${yyyy}-${mm}-${dd}T00:00:00Z`
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const timestampDiterima = `${yyyy}-${mm}-${dd}T${pad(now.getHours())}:${pad(now.getMinutes())}:00Z`
 
-      await api.post('/api/pengecer/terima-stok', {
+      const res = await api.post<any>('/api/pengecer/terima-stok', {
         kirimanId: idKonfirm,
         jumlahDiterima: parseFloat(jumlah),
         timestampDiterima,
       })
 
-      const now = new Date()
-      const pad = (n: number) => String(n).padStart(2, '0')
+      const statusPenerimaan = res.data?.StatusPenerimaan || 'Sesuai'
       const jam = `${pad(now.getHours())}:${pad(now.getMinutes())}`
       setWaktuKonfirmasi(`${waktu} | ${jam}`)
-      setStatus('Sesuai')
+      setStatus(statusPenerimaan)
       setStep(3)
     } catch (err) {
       setKirimError(err instanceof ApiError ? err.message : 'Gagal menerima stok')
@@ -249,69 +252,17 @@ export default function TerimaStokPage() {
                 {step === 2 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                    {/* Jenis Pupuk — searchable dropdown */}
+                    {/* Jenis Pupuk — auto-filled from validation */}
                     <div>
                       <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', marginBottom: '10px', color: '#1a1a1a' }}>
                         Jenis Pupuk
                       </p>
-                      <div ref={dropdownRef} style={{ position: 'relative' }}>
-                        <input
-                          type="text"
-                          value={jenisSearch || jenis}
-                          onChange={e => {
-                            setJenisSearch(e.target.value)
-                            setJenis('')
-                            setShowDropdown(true)
-                          }}
-                          onFocus={() => setShowDropdown(true)}
-                          placeholder="Cari jenis pupuk..."
-                          style={{ ...inputStyle, paddingRight: '40px' }}
-                        />
-                        <span
-                          onClick={() => setShowDropdown(v => !v)}
-                          style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#1e6b1e', userSelect: 'none' }}
-                        >▾</span>
-
-                        {showDropdown && filteredJenis.length > 0 && (
-                          <div style={{
-                            position: 'absolute',
-                            top: 'calc(100% + 6px)',
-                            left: 0, right: 0,
-                            background: 'white',
-                            border: '1.5px solid #c8e0c8',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                            zIndex: 50,
-                            maxHeight: '200px',
-                            overflowY: 'auto',
-                          }}>
-                            {filteredJenis.map((j, i) => (
-                              <div
-                                key={j}
-                                onMouseDown={() => {
-                                  setJenis(j)
-                                  setJenisSearch('')
-                                  setShowDropdown(false)
-                                }}
-                                style={{
-                                  padding: '11px 16px',
-                                  fontSize: '14px',
-                                  color: '#1a1a1a',
-                                  cursor: 'pointer',
-                                  background: jenis === j ? '#f0f9f0' : 'white',
-                                  borderRadius: i === 0 ? '10px 10px 0 0' : i === filteredJenis.length - 1 ? '0 0 10px 10px' : '0',
-                                  fontWeight: jenis === j ? 600 : 400,
-                                  transition: 'background 0.1s',
-                                }}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#f0f9f0')}
-                                onMouseLeave={e => (e.currentTarget.style.background = jenis === j ? '#f0f9f0' : 'white')}
-                              >
-                                {j}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <input
+                        type="text"
+                        value={jenis}
+                        disabled
+                        style={{ ...inputStyle, background: '#f0f0f0', color: '#555' }}
+                      />
                     </div>
 
                     {/* Jumlah Pupuk */}
@@ -508,7 +459,7 @@ export default function TerimaStokPage() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontSize: '14px', color: '#333', fontWeight: 500 }}>{jenisPupuk}</p>
-                    <p style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{jumlahDikirim} Kg</p>
+                    <p style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{formatStock(jumlahDikirim)}</p>
                   </div>
                 </div>
               ))}

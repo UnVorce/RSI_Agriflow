@@ -2,6 +2,11 @@ import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
 import logger from '../../utils/logger';
 
+function extractSqlError(message: string): string {
+  const match = message.match(/Message: `(.+?)`/)
+  return match ? match[1] : message
+}
+
 /**
  * Distributor Service
  * Handles all distributor-related business logic using stored procedures
@@ -38,27 +43,59 @@ export class DistributorService {
         `,
         // 2. Recent shipments (TOP 3)
         prisma.$queryRaw<any[]>`EXEC dbo.usp_GetRecentKiriman @UserIdDistributor = ${userId}`,
-        // 3. Recent stock out (TOP 3)
+        // 3. Recent stock activity (TOP 4 - union of incoming & outgoing)
         prisma.$queryRaw<any[]>`
-          SELECT TOP 3
-            s.PupukId AS pupukId,
-            p.JenisPupuk AS jenisPupuk,
-            s.Jumlah AS jumlah,
-            s.Timestamp AS timestamp,
-            'Aman' AS status
-          FROM trans.STOK s
-          JOIN master.PUPUK p ON s.PupukId = p.PupukId
-          WHERE s.UserId = ${userId}
-          ORDER BY s.Timestamp DESC
+          SELECT TOP 4 * FROM (
+            SELECT
+              CONVERT(NVARCHAR, r.RiwayatId) AS id,
+              p.JenisPupuk AS jenisPupuk,
+              (r.JumlahAkhir - r.JumlahAwal) AS jumlah,
+              FORMAT(r.Timestamp, 'dd/MM/yyyy | HH:mm') AS timestamp,
+              'Masuk' AS status
+            FROM trans.RIWAYAT_STOK r
+            JOIN master.PUPUK p ON r.PupukId = p.PupukId
+            WHERE r.UserId = ${userId}
+              AND r.TipePerubahan = 'Stok Masuk'
+
+            UNION ALL
+
+            SELECT
+              CONVERT(NVARCHAR, k.KirimanId) AS id,
+              p.JenisPupuk AS jenisPupuk,
+              k.JumlahDikirim AS jumlah,
+              FORMAT(k.TimestampDikirim, 'dd/MM/yyyy | HH:mm') AS timestamp,
+              'Keluar' AS status
+            FROM trans.KIRIMAN_PUPUK k
+            JOIN master.PUPUK p ON k.PupukId = p.PupukId
+            WHERE k.UserIdDistributor = ${userId}
+          ) stok
+          ORDER BY timestamp DESC
         `,
-        // 4. Notifications (TOP 5)
-        prisma.$queryRaw<any[]>`EXEC dbo.usp_GetDistributorNotifikasi @UserId = ${userId}`,
+        // 4. Notifications (TOP 5, unread only)
+        prisma.notifikasi.findMany({
+          where: { UserId: userId, StatusDibaca: false },
+          orderBy: { Timestamp: 'desc' },
+          take: 5,
+        }),
       ]);
 
       logger.info('Dashboard retrieved', {
         userId,
         duration: Date.now() - startTime
       });
+
+      // Fetch status from KIRIMAN_PUPUK for SP results (SP doesn't return status)
+      const shipmentIds = (recentShipments || []).map(r => Number(r.KirimanId)).filter(Boolean);
+      let statusMap: Record<number, string> = {};
+      if (shipmentIds.length > 0) {
+        const statusRows = await prisma.kirimanPupuk.findMany({
+          where: { KirimanId: { in: shipmentIds } },
+          select: { KirimanId: true, Status: true },
+        });
+        for (const row of statusRows) {
+          statusMap[Number(row.KirimanId)] = row.Status || '';
+        }
+      }
 
       return {
         stockSummary: stockRows[0] || { totalStock: 0, totalInbound: 0, totalOutgoing: 0 },
@@ -67,19 +104,22 @@ export class DistributorService {
           jenisPupuk: r.NamaPupuk || r.JenisPupuk || '',
           jumlahDikirim: Number(r.JumlahDikirimKg ?? 0),
           timestampDikirim: r.TanggalPengiriman || null,
-          status: r.StatusPengiriman || '',
+          status: statusMap[Number(r.KirimanId)] || '',
         })),
         recentStockOut: (recentStockOut || []).map(r => ({
-          pupukId: Number(r.pupukId ?? 0),
+          id: r.id || '',
           jenisPupuk: r.jenisPupuk || '',
           jumlah: Number(r.jumlah ?? 0),
-          status: r.status || 'Aman',
+          timestamp: r.timestamp || null,
+          status: r.status || '',
         })),
         notifications: (notifications || []).map(r => ({
-          notifikasiId: String(r.NotifikasiId ?? ''),
-          judul: r.JudulNotifikasi || r.Judul || '',
-          pesan: r.PesanNotifikasi || r.Pesan || '',
-          timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+          notifikasiId: String(r.NotifikasiId),
+          judul: r.Judul,
+          pesan: r.Pesan || '',
+          timestamp: r.Timestamp,
+          statusDibaca: Boolean(r.StatusDibaca),
+          jenis: r.Jenis,
         })),
       };
     } catch (error: any) {
@@ -120,7 +160,16 @@ export class DistributorService {
         throw new AppError(validation.Message, 400);
       }
 
-      return validation;
+      const user = await prisma.user.findUnique({
+        where: { UserId: pengecerId },
+        select: { FirstName: true, MiddleName: true, LastName: true },
+      });
+
+      const nama = user
+        ? [user.FirstName, user.MiddleName, user.LastName].filter(Boolean).join(' ')
+        : String(pengecerId);
+
+      return { ...validation, nama };
     } catch (error: any) {
       if (error instanceof AppError) throw error;
       logger.error('Failed to validate pengecer', { pengecerId, error: error.message });
@@ -148,7 +197,7 @@ export class DistributorService {
           @UserIdPengecer = ${data.pengecerId},
           @PupukId = ${data.pupukId},
           @Jumlah = ${data.jumlah},
-          @TimestampKirim = ${data.timestamp ?? new Date()}
+          @TimestampKirim = ${data.timestamp || null}
       `;
 
       logger.info('Shipment created', {
@@ -159,12 +208,13 @@ export class DistributorService {
 
       return result[0];
     } catch (error: any) {
-      if (error.message.includes('Stok tidak mencukupi')) {
+      const msg = extractSqlError(error.message);
+      if (msg.includes('Stok tidak mencukupi')) {
         logger.warn('Insufficient stock', { 
           distributorId: data.distributorId, 
           pupukId: data.pupukId 
         });
-        throw new AppError(error.message, 400);
+        throw new AppError(msg, 400);
       }
       
       logger.error('Failed to create shipment', { 
@@ -245,7 +295,7 @@ export class DistributorService {
           @UserId = ${data.userId},
           @PupukId = ${data.pupukId},
           @JumlahPenyesuaian = ${data.jumlahPenyesuaian},
-          @Waktu = ${data.waktu ?? new Date()}
+          @Waktu = ${data.waktu || null}
       `;
 
       logger.info('Stock adjusted', { 
@@ -256,11 +306,12 @@ export class DistributorService {
 
       return result[0];
     } catch (error: any) {
-      if (error.message.includes('Stok tidak mencukupi')) {
-        throw new AppError(error.message, 400);
+      const msg = extractSqlError(error.message);
+      if (msg.includes('Stok tidak mencukupi')) {
+        throw new AppError(msg, 400);
       }
       logger.error('Failed to adjust stock', { data, error: error.message });
-      throw new AppError('Gagal menyesuaikan stok', 500);
+      throw new AppError(msg, 400);
     }
   }
 
@@ -284,7 +335,7 @@ export class DistributorService {
           @UserId = ${data.userId},
           @PupukId = ${data.pupukId},
           @JumlahMasuk = ${data.jumlahMasuk},
-          @Waktu = ${data.waktu ?? new Date()}
+          @Waktu = ${data.waktu || null}
       `;
 
       logger.info('Stock added', { 
@@ -296,8 +347,7 @@ export class DistributorService {
       return result[0];
     } catch (error: any) {
       if (error instanceof AppError) throw error;
-      logger.error('Failed to add stock', { data, error: error.message });
-      throw new AppError('Gagal menambah stok', 500);
+      throw new AppError(extractSqlError(error.message), 400);
     }
   }
 
@@ -433,17 +483,21 @@ export class DistributorService {
    */
   async getNotifications(userId: number, pageNumber: number = 1) {
     try {
-      const rows = await prisma.$queryRaw<any[]>`
-        EXEC dbo.usp_GetDistributorNotifikasi
-          @UserId = ${userId},
-          @PageNumber = ${pageNumber}
-      `;
-
-      return (rows || []).map(r => ({
-        notifikasiId: String(r.NotifikasiId ?? ''),
-        judul: r.JudulNotifikasi || r.Judul || '',
-        pesan: r.PesanNotifikasi || r.Pesan || '',
-        timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+      const pageSize = 8;
+      const notifications = await prisma.notifikasi.findMany({
+        where: { UserId: userId },
+        orderBy: { Timestamp: 'desc' },
+        take: pageSize,
+        skip: (pageNumber - 1) * pageSize,
+      });
+      return notifications.map(r => ({
+        notifikasiId: String(r.NotifikasiId),
+        id: r.NotifikasiId,
+        judul: r.Judul,
+        pesan: r.Pesan || '',
+        timestamp: r.Timestamp,
+        statusDibaca: Boolean(r.StatusDibaca),
+        jenis: r.Jenis,
       }));
     } catch (error: any) {
       logger.error('Failed to get notifications', { userId, error: error.message });

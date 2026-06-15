@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Sidebar from '@/components/pengecer/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 import { ChevronLeft } from 'lucide-react'
+import { formatStock } from '@/lib/format'
 import { api } from '@/lib/api'
 
 interface StokItem {
@@ -108,7 +109,7 @@ export default function DetailStokPage() {
               </div>
               <div>
                 <p style={{ fontSize: '13px', color: '#888', marginBottom: '4px' }}>Jumlah Stok</p>
-                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '18px', color: '#1a1a1a' }}>{item.jumlahStok} Ton</p>
+                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '18px', color: '#1a1a1a' }}>{formatStock(item.jumlahStok)}</p>
               </div>
               <div>
                 <p style={{ fontSize: '13px', color: '#888', marginBottom: '4px' }}>Terakhir Diperbarui</p>
@@ -137,16 +138,18 @@ export default function DetailStokPage() {
                 const ts = r.TimestampDikirim || r.timestampDikirim
                 const tgl = ts ? new Date(ts).toLocaleDateString('id-ID') : '-'
                 const status = r.Status || r.status || 'Sesuai'
-                const ok = status === 'Sesuai' || status === 'Diterima' || status === 'Berhasil'
+                const bgColor = status === 'Dikirim' ? '#eab308'
+                  : status === 'Tidak Sesuai' ? '#dc2626'
+                  : '#16a34a'
 
                 return (
                   <div key={`${idStr}-${i}`} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
                     <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{idStr.slice(0, 8)}</span>
                     <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{jenis}</span>
-                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{jml}</span>
+                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{formatStock(jml)}</span>
                     <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{tgl}</span>
                     <div style={{ textAlign: 'center' }}>
-                      <span style={{ padding: '5px 16px', borderRadius: '999px', background: ok ? '#1e6b1e' : '#c53030', color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>{status}</span>
+                      <span style={{ display: 'inline-block', padding: '5px 0', borderRadius: '999px', width: '120px', textAlign: 'center', background: bgColor, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>{status}</span>
                     </div>
                   </div>
                 )

@@ -6,6 +6,7 @@ import { UserCircle, MapPin, CheckCircle2 } from 'lucide-react'
 import Sidebar from '@/components/pengecer/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 import { api, ApiError } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface KuotaPupuk { jenis: string; kuota: number }
 interface DataPetani { nama: string; alamat: string; kuotaPupuk: KuotaPupuk[] }
@@ -248,8 +249,8 @@ export default function PenebusanPupukPage() {
                       </p>
                       <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '28px', color: '#155215' }}>
                         {jenis
-                          ? `${petani.kuotaPupuk.find(k => k.jenis === jenis)?.kuota ?? 0} Kg`
-                          : `${petani.kuotaPupuk.reduce((s, k) => s + k.kuota, 0)} Kg`
+                          ? formatStock(petani.kuotaPupuk.find(k => k.jenis === jenis)?.kuota ?? 0)
+                          : formatStock(petani.kuotaPupuk.reduce((s, k) => s + k.kuota, 0))
                         }
                       </p>
                     </div>
@@ -355,7 +356,7 @@ export default function PenebusanPupukPage() {
                     { label: 'ID Petani',        val: idKonfirm },
                     { label: 'Nama Petani',       val: petani.nama },
                     { label: 'Jenis Pupuk',       val: jenis },
-                    { label: 'Jumlah Pupuk',      val: `${jumlah} Kg` },
+                    { label: 'Jumlah Pupuk',      val: formatStock(parseFloat(jumlah) || 0) },
                     { label: 'Waktu Penebusan',   val: waktuTebus },
                     { label: 'Status',            val: status },
                   ].map(({ label, val }) => (

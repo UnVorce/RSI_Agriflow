@@ -4,6 +4,15 @@ import { PupukService } from './pupuk.service';
 const pupukService = new PupukService();
 
 export class PupukController {
+  async getAllPupuk(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await pupukService.getAllPupuk();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createPupuk(req: Request, res: Response, next: NextFunction) {
     try {
       const { jenisPupuk } = req.body;

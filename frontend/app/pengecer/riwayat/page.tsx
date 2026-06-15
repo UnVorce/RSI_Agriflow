@@ -5,10 +5,11 @@ import Sidebar from '@/components/pengecer/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
 import { api } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface RiwayatItem {
   KirimanId?: string; kirimanId?: string
-  PenebusanId?: string; penebusanId?: string
+  PenebusanId?: string; penebusanId?: string; tebusanId?: string
   JenisPupuk?: string; jenisPupuk?: string
   JumlahDikirim?: number; jumlahDikirim?: number
   Jumlah?: number; jumlah?: number
@@ -24,7 +25,7 @@ interface RiwayatData {
 }
 
 type Tab    = 'penerimaan' | 'penebusan'
-type Status = 'Semua' | 'Sesuai' | 'Tidak Sesuai'
+type Status = 'Semua' | 'Diterima' | 'Dikirim' | 'Tidak Sesuai' | 'Berhasil'
 
 function formatDisplay(iso: string) {
   if (!iso) return ''
@@ -76,8 +77,13 @@ export default function RiwayatPage() {
     ? (data?.receipts ?? [])
     : (data?.redemptions ?? [])
 
-  const getStatus = (item: RiwayatItem): string => {
-    return item.Status || item.status || 'Sesuai'
+  const getStatus = (item: RiwayatItem, currentTab: string): string => {
+    const s = item.Status || item.status || ''
+    if (currentTab === 'penebusan') return s || 'Berhasil'
+    if (s === 'Diterima' || s === 'Sesuai' || s === 'Berhasil') return 'Diterima'
+    if (s === 'Dikirim') return 'Dikirim'
+    if (s === 'Tidak Sesuai') return 'Tidak Sesuai'
+    return s || 'Diterima'
   }
 
   const filtered = raw.filter(row => {
@@ -87,8 +93,10 @@ export default function RiwayatPage() {
     const rowTs = timestampStr ? new Date(timestampStr).getTime() : null
     const matchStart = appliedStart ? (rowTs !== null && rowTs >= new Date(appliedStart).getTime()) : true
     const matchEnd   = appliedEnd   ? (rowTs !== null && rowTs <= new Date(appliedEnd + 'T23:59:59').getTime()) : true
-    const statusVal = getStatus(row)
-    const matchStatus = appliedStatus === 'Semua' || (appliedStatus === 'Sesuai' ? (statusVal === 'Sesuai' || statusVal === 'Diterima' || statusVal === 'Berhasil') : statusVal === 'Tidak Sesuai')
+    const statusVal = getStatus(row, tab)
+    const matchStatus = appliedStatus === 'Semua'
+      || appliedStatus === statusVal
+      || (appliedStatus === 'Diterima' && statusVal === 'Diterima')
     return matchSearch && matchStart && matchEnd && matchStatus
   })
 
@@ -99,11 +107,11 @@ export default function RiwayatPage() {
 
   const statCards = tab === 'penerimaan'
     ? [
-        { label: 'Total Penerimaan (Kg)', value: totalStok },
-        { label: 'Penerimaan Tidak Sesuai', value: totalTidakSesuai },
+        { label: 'Total Penerimaan', value: formatStock(totalStok) },
+        { label: 'Penerimaan Tidak Sesuai', value: String(totalTidakSesuai) },
       ]
     : [
-        { label: 'Jumlah Penebusan', value: summaryNya.totalPenebusan ?? 0 },
+        { label: 'Jumlah Penebusan', value: formatStock(summaryNya.totalPenebusan ?? 0) },
       ]
 
   const pageSize = 10
@@ -276,26 +284,57 @@ export default function RiwayatPage() {
                     </div>
                   </div>
 
-                  {/* Status Penerimaan */}
+                  {/* Status Penerimaan / Penebusan */}
                   <p style={{ fontSize: '12px', fontWeight: 600, color: '#555', marginBottom: '8px', fontFamily: 'var(--font-display)' }}>
-                    Status Penerimaan
+                    Status {tab === 'penebusan' ? 'Penebusan' : 'Penerimaan'}
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                    {(['Semua', 'Sesuai', 'Tidak Sesuai'] as Status[]).map(s => (
-                      <button
-                        key={s}
-                        onClick={() => setStatusFilter(s)}
-                        style={{
-                          padding: '7px 16px', borderRadius: '999px',
-                          border: `1.5px solid ${statusFilter === s ? '#1e6b1e' : '#ddd'}`,
-                          background: statusFilter === s ? '#1e6b1e' : 'white',
-                          color: statusFilter === s ? 'white' : '#555',
-                          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px',
-                          cursor: 'pointer', transition: 'all 0.15s',
-                        }}
-                      >{s}</button>
-                    ))}
-                  </div>
+                  {tab === 'penebusan' ? (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                      {(['Semua', 'Berhasil'] as Status[]).map(s => (
+                        <button key={s} onClick={() => setStatusFilter(s)}
+                          style={{
+                            padding: '7px 16px', borderRadius: '999px',
+                            border: `1.5px solid ${statusFilter === s ? '#1e6b1e' : '#ddd'}`,
+                            background: statusFilter === s ? '#1e6b1e' : 'white',
+                            color: statusFilter === s ? 'white' : '#555',
+                            fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px',
+                            cursor: 'pointer', transition: 'all 0.15s',
+                          }}
+                        >{s}</button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {(['Semua', 'Diterima', 'Dikirim'] as Status[]).map(s => (
+                          <button key={s} onClick={() => setStatusFilter(s)}
+                            style={{
+                              padding: '7px 16px', borderRadius: '999px',
+                              border: `1.5px solid ${statusFilter === s ? '#1e6b1e' : '#ddd'}`,
+                              background: statusFilter === s ? '#1e6b1e' : 'white',
+                              color: statusFilter === s ? 'white' : '#555',
+                              fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px',
+                              cursor: 'pointer', transition: 'all 0.15s',
+                            }}
+                          >{s}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {(['Tidak Sesuai'] as Status[]).map(s => (
+                          <button key={s} onClick={() => setStatusFilter(s)}
+                            style={{
+                              padding: '7px 16px', borderRadius: '999px',
+                              border: `1.5px solid ${statusFilter === s ? '#1e6b1e' : '#ddd'}`,
+                              background: statusFilter === s ? '#1e6b1e' : 'white',
+                              color: statusFilter === s ? 'white' : '#555',
+                              fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px',
+                              cursor: 'pointer', transition: 'all 0.15s',
+                            }}
+                          >{s}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -320,9 +359,14 @@ export default function RiwayatPage() {
           </div>
 
           {/* Table */}
+          {(() => {
+            const headers = tab === 'penerimaan'
+              ? ['ID Pengiriman', 'Jenis Pupuk', 'Jumlah Pupuk', 'Tanggal Penerimaan', 'Status']
+              : ['ID Penebusan',  'Jenis Pupuk', 'Jumlah Pupuk', 'Tanggal Penebusan',  'Status']
+            return (
           <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #eee', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '14px 24px', borderBottom: '1px solid #f0f0f0' }}>
-              {['ID Pengiriman', 'Jenis Pupuk', 'Jumlah Pupuk', 'Tanggal Penerimaan', 'Status'].map(h => (
+              {headers.map(h => (
                 <span key={h} style={{ fontSize: '14px', color: '#888', fontWeight: 500, textAlign: 'center' }}>{h}</span>
               ))}
             </div>
@@ -337,24 +381,26 @@ export default function RiwayatPage() {
               </div>
             ) : (
               displayed.map((row, i) => {
-                const idStr = row.KirimanId || row.kirimanId || row.PenebusanId || row.penebusanId || '-'
+                const idStr = row.KirimanId || row.kirimanId || row.PenebusanId || row.penebusanId || row.tebusanId || '-'
                 const jenisNya = row.JenisPupuk || row.jenisPupuk || '-'
                 const jumlahNya = row.JumlahDikirim ?? row.jumlahDikirim ?? row.Jumlah ?? row.jumlah ?? 0
                 const timestampStr = row.TimestampDikirim || row.timestampDikirim || row.TimestampPenebusan || row.timestampPenebusan || ''
                 const tanggalNya = timestampStr ? new Date(timestampStr).toLocaleDateString('id-ID') : '-'
-                const statusNya = getStatus(row)
-                const statusOk = statusNya === 'Sesuai' || statusNya === 'Diterima' || statusNya === 'Berhasil'
+                const statusNya = getStatus(row, tab)
+                const statusBg = statusNya === 'Dikirim' ? '#eab308'
+                  : statusNya === 'Tidak Sesuai' ? '#dc2626'
+                  : '#16a34a'
 
                 return (
                   <div key={`${idStr}-${i}`} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
                     <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{idStr.slice(0, 8)}</span>
                     <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{jenisNya}</span>
-                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{jumlahNya}</span>
+                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{formatStock(jumlahNya)}</span>
                     <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{tanggalNya}</span>
                     <div style={{ textAlign: 'center' }}>
                       <span style={{
-                        padding: '5px 16px', borderRadius: '999px',
-                        background: statusOk ? '#1e6b1e' : '#c53030',
+                        padding: '5px 0', borderRadius: '999px', display: 'inline-block', width: '120px', textAlign: 'center',
+                        background: statusBg,
                         color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px',
                       }}>
                         {statusNya}
@@ -365,6 +411,7 @@ export default function RiwayatPage() {
               })
             )}
           </div>
+          )})()}
 
           {/* Pagination */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px', marginTop: '20px' }}>

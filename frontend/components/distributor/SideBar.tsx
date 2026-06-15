@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -14,6 +15,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { api } from '@/lib/api'
 
 const navItems = [
   { label: 'Halaman Utama',      href: '/distributor/dashboard',          icon: Home },
@@ -23,11 +25,14 @@ const navItems = [
   { label: 'Notifikasi',         href: '/distributor/notifikasi',         icon: Bell },
 ]
 
-interface SidebarProps {
-  notifCount?: number
-}
+export default function Sidebar() {
+  const [notifCount, setNotifCount] = useState(0)
 
-export default function Sidebar({ notifCount = 0 }: SidebarProps) {
+  useEffect(() => {
+    api.get<{ count: number }>('/api/notifications/unread-count')
+      .then(res => { if (res.data) setNotifCount(res.data.count) })
+      .catch(() => {})
+  }, [])
   const pathname = usePathname()
   const { logout } = useAuth()
   const router = useRouter()

@@ -21,6 +21,7 @@ export default function NotifikasiDistributorPage() {
   const [error, setError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedNotif, setSelectedNotif] = useState<NotifikasiItem | null>(null)
+  const [markingRead, setMarkingRead] = useState(false)
 
   const ITEMS_PER_PAGE = 5
   const totalPages = Math.max(1, Math.ceil(notifikasiData.length / ITEMS_PER_PAGE))
@@ -36,9 +37,26 @@ export default function NotifikasiDistributorPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  async function handleMarkRead() {
+    if (!selectedNotif || selectedNotif.statusDibaca) return
+    setMarkingRead(true)
+    try {
+      await api.patch(`/api/notifications/${selectedNotif.notifikasiId}/read`)
+      const updated = { ...selectedNotif, statusDibaca: true }
+      setSelectedNotif(updated)
+      setNotifikasiData(prev =>
+        prev.map(n => n.notifikasiId === updated.notifikasiId ? updated : n)
+      )
+    } catch {
+      // silent
+    } finally {
+      setMarkingRead(false)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb' }}>
-      <Sidebar notifCount={2} />
+      <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <TopBar />
@@ -83,17 +101,19 @@ export default function NotifikasiDistributorPage() {
                   key={row.notifikasiId || i} 
                   style={{ 
                     display: 'grid', gridTemplateColumns: '60px 220px 1fr 160px 160px', padding: '16px 24px', 
-                    background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center', 
-                    borderBottom: i === currentData.length - 1 ? 'none' : '1px solid #f9f9f9' 
+                    background: row.statusDibaca ? '#f0f0f0' : i % 2 === 0 ? '#fafafa' : 'white',
+                    alignItems: 'center', 
+                    borderBottom: i === currentData.length - 1 ? 'none' : '1px solid #f9f9f9',
+                    opacity: row.statusDibaca ? 0.55 : 1,
                   }}
                 >
-                  <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{startIndex + i + 1}</span>
-                  <span style={{ fontSize: '13px', color: '#c53030', fontWeight: 700, letterSpacing: '0.02em' }}>{row.jenis || 'PENERIMAAN'}</span>
+                  <span style={{ fontSize: '14px', color: '#555', textAlign: 'center', fontWeight: row.statusDibaca ? 400 : 600 }}>{startIndex + i + 1}</span>
+                  <span style={{ fontSize: '13px', color: row.statusDibaca ? '#999' : '#c53030', fontWeight: row.statusDibaca ? 500 : 700, letterSpacing: '0.02em' }}>{row.jenis || 'PENERIMAAN'}</span>
                   <div>
-                    <span style={{ fontSize: '15px', color: '#1a1a1a', fontWeight: 600, display: 'block' }}>{row.judul}</span>
-                    <span style={{ fontSize: '12px', color: '#888' }}>ID: {row.notifikasiId?.slice(0, 8) || '-'}</span>
+                    <span style={{ fontSize: '15px', color: row.statusDibaca ? '#999' : '#1a1a1a', fontWeight: row.statusDibaca ? 400 : 600, display: 'block' }}>{row.judul}</span>
+                    <span style={{ fontSize: '12px', color: row.statusDibaca ? '#bbb' : '#888' }}>ID: {row.notifikasiId?.slice(0, 8) || '-'}</span>
                   </div>
-                  <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>
+                  <span style={{ fontSize: '14px', color: row.statusDibaca ? '#bbb' : '#555', textAlign: 'center', fontWeight: row.statusDibaca ? 400 : 500 }}>
                     {row.timestamp ? new Date(row.timestamp).toLocaleDateString('id-ID') : '-'}
                   </span>
                   
@@ -207,12 +227,33 @@ export default function NotifikasiDistributorPage() {
                   </div>
                 </div>
 
-                <button 
-                  onClick={() => setSelectedNotif(null)}
-                  style={{ width: '100%', padding: '14px', borderRadius: '12px', background: '#1e6b1e', color: 'white', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px', border: 'none', cursor: 'pointer', marginTop: '24px' }}
-                >
-                  Tutup Detail
-                </button>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                  {!selectedNotif.statusDibaca && (
+                    <button
+                      onClick={handleMarkRead}
+                      disabled={markingRead}
+                      style={{
+                        flex: 1, padding: '14px', borderRadius: '12px',
+                        background: markingRead ? '#6B8F6B' : '#1e6b1e', color: 'white',
+                        fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px',
+                        border: 'none', cursor: markingRead ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {markingRead ? 'Memproses...' : 'Tandai Sudah Dibaca'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedNotif(null)}
+                    style={{
+                      flex: 1, padding: '14px', borderRadius: '12px',
+                      background: 'white', color: '#1e6b1e',
+                      fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px',
+                      border: '2px solid #1e6b1e', cursor: 'pointer',
+                    }}
+                  >
+                    Tutup
+                  </button>
+                </div>
 
               </div>
             </div>

@@ -6,6 +6,7 @@ import { CheckCircle2, Calendar } from 'lucide-react'
 import Sidebar from '@/components/distributor/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import { api, ApiError } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface StockItem { pupukId: number; jenisPupuk: string; jumlah: number; lastUpdated: string }
 
@@ -104,7 +105,9 @@ export default function TambahPengirimanPage() {
       const selected = stockOptions.find(s => s.name === jenis)
       if (!selected) throw new Error('Jenis pupuk tidak ditemukan')
       const [dd, mm, yyyy] = waktu.split('/')
-      const timestamp = `${yyyy}-${mm}-${dd}T00:00:00Z`
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const timestamp = `${yyyy}-${mm}-${dd}T${pad(now.getHours())}:${pad(now.getMinutes())}:00Z`
 
       await api.post('/api/distributor/pengiriman', {
         pengecerId: idKonfirm,
@@ -113,8 +116,6 @@ export default function TambahPengirimanPage() {
         timestamp,
       })
 
-      const now = new Date()
-      const pad = (n: number) => String(n).padStart(2, '0')
       const jam = `${pad(now.getHours())}:${pad(now.getMinutes())} WIB`
       setWaktuKonfirmasi(`${waktu} | ${jam}`)
       setStep(3)
@@ -154,7 +155,7 @@ export default function TambahPengirimanPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb' }}>
-      <Sidebar notifCount={5} />
+      <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <TopBar />
@@ -257,7 +258,7 @@ export default function TambahPengirimanPage() {
                       { label: 'ID Pengecer',      val: idKonfirm },
                       { label: 'Nama Tujuan',      val: pengecer?.nama },
                       { label: 'Jenis Pupuk',      val: jenis },
-                      { label: 'Jumlah Pupuk',     val: `${jumlah} Ton` },
+                      { label: 'Jumlah Pupuk',     val: `{formatStock(parseFloat(jumlah) || 0)}` },
                       { label: 'Waktu Pengiriman', val: waktuKonfirmasi },
                     ].map(({ label, val }) => (
                       <div key={label} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '6px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
@@ -296,7 +297,7 @@ export default function TambahPengirimanPage() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontSize: '14px', color: '#333', fontWeight: 500 }}>{jenisPupuk}</p>
-                    <p style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{jumlahDikirim} Ton</p>
+                    <p style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{formatStock(jumlahDikirim)}</p>
                   </div>
                 </div>
               ))}

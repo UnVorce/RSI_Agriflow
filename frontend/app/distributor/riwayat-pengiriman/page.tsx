@@ -5,6 +5,7 @@ import Sidebar from '@/components/distributor/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
 import { api } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface PengirimanItem {
   kirimanId: string
@@ -22,7 +23,7 @@ interface ShipmentSummary {
   totalMismatch: number
 }
 
-type Status = 'Semua' | 'Sesuai' | 'Tidak Sesuai'
+type Status = 'Semua' | 'Diterima' | 'Dikirim' | 'Tidak Sesuai'
 
 function formatDisplay(iso: string) {
   if (!iso) return ''
@@ -75,7 +76,8 @@ export default function RiwayatPengirimanPage() {
   }, [])
 
   const statusLabel = (s: string): Status => {
-    if (s === 'Diterima' || s === 'Sesuai') return 'Sesuai'
+    if (s === 'Diterima' || s === 'Sesuai') return 'Diterima'
+    if (s === 'Dikirim') return 'Dikirim'
     if (s === 'Tidak Sesuai') return 'Tidak Sesuai'
     return 'Semua'
   }
@@ -100,7 +102,7 @@ export default function RiwayatPengirimanPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb' }}>
-      <Sidebar notifCount={5} />
+      <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <TopBar />
@@ -185,18 +187,33 @@ export default function RiwayatPengirimanPage() {
                       </div>
 
                       <p style={{ fontSize: '12px', fontWeight: 600, color: '#555', marginBottom: '8px', fontFamily: 'var(--font-display)' }}>Status Pengiriman</p>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                        {(['Semua', 'Sesuai', 'Tidak Sesuai'] as Status[]).map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setStatusFilter(s)}
-                            style={{
-                              padding: '7px 16px', borderRadius: '999px', border: `1.5px solid ${statusFilter === s ? '#1e6b1e' : '#ddd'}`,
-                              background: statusFilter === s ? '#1e6b1e' : 'white', color: statusFilter === s ? 'white' : '#555',
-                              fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.15s',
-                            }}
-                          >{s}</button>
-                        ))}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {(['Semua', 'Diterima', 'Dikirim'] as Status[]).map(s => (
+                            <button
+                              key={s}
+                              onClick={() => setStatusFilter(s)}
+                              style={{
+                                padding: '7px 16px', borderRadius: '999px', border: `1.5px solid ${statusFilter === s ? '#1e6b1e' : '#ddd'}`,
+                                background: statusFilter === s ? '#1e6b1e' : 'white', color: statusFilter === s ? 'white' : '#555',
+                                fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.15s',
+                              }}
+                            >{s}</button>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {(['Tidak Sesuai'] as Status[]).map(s => (
+                            <button
+                              key={s}
+                              onClick={() => setStatusFilter(s)}
+                              style={{
+                                padding: '7px 16px', borderRadius: '999px', border: `1.5px solid ${statusFilter === s ? '#1e6b1e' : '#ddd'}`,
+                                background: statusFilter === s ? '#1e6b1e' : 'white', color: statusFilter === s ? 'white' : '#555',
+                                fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.15s',
+                              }}
+                            >{s}</button>
+                          ))}
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -243,18 +260,20 @@ export default function RiwayatPengirimanPage() {
               <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Tidak ada data yang cocok.</div>
             ) : (
               displayed.map((row, i) => {
-                const displayStatus = row.status === 'Diterima' ? 'Sesuai' : row.status === 'Tidak Sesuai' ? 'Tidak Sesuai' : row.status
+                const bgColor = row.status === 'Diterima' || row.status === 'Sesuai' ? '#72A94F'
+                  : row.status === 'Dikirim' ? '#E6A817'
+                  : '#BA1A1A'
                 return (
                   <div key={row.kirimanId || i} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
                     <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{row.kirimanId?.slice(0, 8) || '-'}</span>
                     <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jenisPupuk}</span>
-                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jumlahDikirim} Ton</span>
+                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{formatStock(row.jumlahDikirim)}</span>
                     <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>
                       {row.timestampDikirim ? new Date(row.timestampDikirim).toLocaleDateString('id-ID') : '-'}
                     </span>
                     <div style={{ textAlign: 'center' }}>
-                      <span style={{ padding: '5px 16px', borderRadius: '999px', background: displayStatus === 'Sesuai' || displayStatus === 'Diterima' ? '#1e6b1e' : '#c53030', color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>
-                        {displayStatus}
+                      <span style={{ display: 'inline-block', padding: '5px 0', borderRadius: '999px', background: bgColor, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', width: '120px', textAlign: 'center' }}>
+                        {row.status}
                       </span>
                     </div>
                   </div>

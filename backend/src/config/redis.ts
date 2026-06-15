@@ -6,6 +6,8 @@ const redisClient = createClient({
   socket: {
     host: config.redis.host,
     port: config.redis.port,
+    connectTimeout: 3000,
+    reconnectStrategy: () => false,
   },
   password: config.redis.password,
 });

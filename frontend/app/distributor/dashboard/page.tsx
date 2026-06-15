@@ -6,26 +6,30 @@ import TopBar from '@/components/layout/TopBar'
 import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { api } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface DashboardData {
   stockSummary: { totalStock: number; totalInbound: number; totalOutgoing: number }
   recentShipments: { kirimanId: string; jenisPupuk: string; jumlahDikirim: number; timestampDikirim: string; status: string }[]
-  recentStockOut: { pupukId: number; jenisPupuk: string; jumlah: number; status: string }[]
+  recentStockOut: { id: string; jenisPupuk: string; jumlah: number; timestamp: string; status: string }[]
   notifications: { notifikasiId: string; judul: string; pesan: string; timestamp: string }[]
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const ok = status === 'Berhasil' || status === 'Sesuai' || status === 'Aman' || status === 'Dikirim' || status === 'Diterima'
+  const isGreen = status === 'Berhasil' || status === 'Sesuai' || status === 'Aman' || status === 'Dikirim' || status === 'Diterima' || status === 'Masuk'
   return (
     <span
       style={{
-        padding: '5px 18px',
+        padding: '5px 0',
         borderRadius: '999px',
-        background: ok ? '#72A94F' : '#BA1A1A',
+        background: isGreen ? '#72A94F' : '#BA1A1A',
         color: 'white',
         fontFamily: 'var(--font-display)',
         fontWeight: 600,
         fontSize: '13px',
+        width: '100px',
+        textAlign: 'center',
+        display: 'inline-block',
       }}
     >
       {status}
@@ -34,7 +38,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function ActivityRow({ kirimanId, jenisPupuk, jumlahDikirim, timestampDikirim, status }: DashboardData['recentShipments'][0]) {
-  const date = timestampDikirim ? new Date(timestampDikirim).toLocaleDateString('id-ID') : '-'
+  const date = timestampDikirim ? timestampDikirim.split(' | ')[0] : '-'
   return (
     <div
       style={{
@@ -55,14 +59,15 @@ function ActivityRow({ kirimanId, jenisPupuk, jumlahDikirim, timestampDikirim, s
       </div>
       <div style={{ flex: 1 }}>
         <p style={{ fontSize: '13px', color: '#333', fontWeight: 500 }}>{jenisPupuk}</p>
-        <p style={{ fontSize: '12px', color: '#888' }}>{jumlahDikirim} Ton</p>
+        <p style={{ fontSize: '12px', color: '#888' }}>{formatStock(jumlahDikirim)}</p>
       </div>
       <StatusBadge status={status} />
     </div>
   )
 }
 
-function StokRow({ jenisPupuk, jumlah, status }: DashboardData['recentStockOut'][0]) {
+function StokRow({ id, jenisPupuk, jumlah, timestamp, status }: DashboardData['recentStockOut'][0]) {
+  const date = timestamp ? timestamp.split(' | ')[0] : '-'
   return (
     <div
       style={{
@@ -75,15 +80,17 @@ function StokRow({ jenisPupuk, jumlah, status }: DashboardData['recentStockOut']
         height: '68px',
       }}
     >
-      <div style={{ flex: 1.5 }}>
-        <p style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a' }}>
-          {jenisPupuk}
+      <div style={{ flex: 1 }}>
+        <p style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', color: '#1a1a1a' }}>
+          ID : {id?.slice(0, 8) || '-'}
         </p>
+        <p style={{ fontSize: '12px', color: '#888' }}>{date}</p>
       </div>
       <div style={{ flex: 1 }}>
-        <p style={{ fontSize: '13px', color: '#555', fontWeight: 500 }}>Stok : {jumlah} Ton</p>
+        <p style={{ fontSize: '13px', color: '#333', fontWeight: 500 }}>{jenisPupuk}</p>
+        <p style={{ fontSize: '12px', color: '#888' }}>{formatStock(jumlah)}</p>
       </div>
-      <StatusBadge status={status || 'Aman'} />
+      <StatusBadge status={status} />
     </div>
   )
 }
@@ -103,9 +110,9 @@ export default function DashboardDistributorPage() {
   }, [])
 
   const statCards = data ? [
-    { label: 'Total Stok Keseluruhan',  value: String(data.stockSummary?.totalStock ?? 0), unit: 'Ton' },
-    { label: 'Total Stok Masuk',        value: String(data.stockSummary?.totalInbound ?? 0), unit: 'Ton' },
-    { label: 'Total Stok Keluar',       value: String(data.stockSummary?.totalOutgoing ?? 0), unit: 'Ton' },
+    { label: 'Total Stok Keseluruhan',  value: data.stockSummary?.totalStock ?? 0 },
+    { label: 'Total Stok Masuk',        value: data.stockSummary?.totalInbound ?? 0 },
+    { label: 'Total Stok Keluar',       value: data.stockSummary?.totalOutgoing ?? 0 },
   ] : []
 
   const aktivitasPengiriman = data?.recentShipments ?? []
@@ -180,7 +187,7 @@ export default function DashboardDistributorPage() {
 
             {/* Stat cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-              {statCards.map(({ label, value, unit }) => (
+              {statCards.map(({ label, value }) => (
                 <div
                   key={label}
                   style={{
@@ -192,11 +199,8 @@ export default function DashboardDistributorPage() {
                   }}
                 >
                   <p style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>{label}</p>
-                  <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '44px', color: '#1a1a1a', lineHeight: 1 }}>
-                    {value}{' '}
-                    {unit && (
-                      <span style={{ fontSize: '18px', fontWeight: 500, color: '#888' }}>{unit}</span>
-                    )}
+                  <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '32px', color: '#1a1a1a', lineHeight: 1 }}>
+                    {formatStock(value)}
                   </p>
                 </div>
               ))}
@@ -235,19 +239,19 @@ export default function DashboardDistributorPage() {
                   </div>
                 </div>
 
-                {/* Stok Pupuk */}
+                {/* Aktivitas Stok */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <p style={{ fontWeight: 600, fontSize: '14px', color: '#333' }}>Stok Pupuk</p>
-                    <Link href="/distributor/riwayat-stok" style={{ fontSize: '13px', color: '#1e6b1e', fontWeight: 500 }}>
+                    <p style={{ fontWeight: 600, fontSize: '14px', color: '#333' }}>Aktivitas Stok</p>
+                    <Link href="/distributor/manajemen-stok" style={{ fontSize: '13px', color: '#1e6b1e', fontWeight: 500 }}>
                       Lihat Semua
                     </Link>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {stokPupuk.length === 0 ? (
-                      <p style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '12px' }}>Belum ada stok</p>
+                      <p style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '12px' }}>Belum ada aktivitas stok</p>
                     ) : (
-                      stokPupuk.map((item, idx) => <StokRow key={item.pupukId ?? idx} {...item} />)
+                      stokPupuk.map((item, idx) => <StokRow key={item.id || idx} {...item} />)
                     )}
                   </div>
                 </div>

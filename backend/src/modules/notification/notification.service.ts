@@ -23,7 +23,15 @@ export class NotificationService {
       },
     });
 
-    return notifications;
+    return notifications.map(r => ({
+      notifikasiId: String(r.NotifikasiId),
+      id: r.NotifikasiId,
+      judul: r.Judul,
+      pesan: r.Pesan || '',
+      timestamp: r.Timestamp,
+      statusDibaca: Boolean(r.StatusDibaca),
+      jenis: r.Jenis,
+    }));
   }
 
   async markAsRead(notificationId: number, userId: number) {

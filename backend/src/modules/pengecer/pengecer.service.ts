@@ -1,6 +1,16 @@
 import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
 
+function esc(val: string | null | undefined): string {
+  if (val == null) return 'NULL';
+  return `'${val.replace(/'/g, "''")}'`;
+}
+
+function extractSqlError(message: string): string {
+  const match = message.match(/Message: `(.+?)`/)
+  return match ? match[1] : message
+}
+
 /**
  * Pengecer (Retailer) Service
  * Handles all retailer-related business logic using stored procedures
@@ -66,6 +76,8 @@ export class PengecerService {
         judul: r.JudulNotifikasi || r.Judul || '',
         pesan: r.PesanNotifikasi || r.Pesan || '',
         timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+        statusDibaca: Boolean(r.StatusDibaca),
+        jenis: r.Jenis || r.JenisNotifikasi || '',
       })),
       recentReceipts: (recentReceipts || []).map(r => ({
         kirimanId: String(r.kirimanId ?? ''),
@@ -119,7 +131,6 @@ export class PengecerService {
 
   /**
    * Receive shipment from distributor
-   * SP: dbo.usp_TerimaKirimanPengecer
    */
   async receiveShipment(data: {
     pengecerId: number;
@@ -127,26 +138,150 @@ export class PengecerService {
     jumlahDiterima: number;
     timestampDiterima?: Date;
   }) {
-    try {
-      const timestampParam = data.timestampDiterima
-        ? `'${data.timestampDiterima.toISOString()}'`
-        : 'NULL';
+    if (data.jumlahDiterima <= 0) {
+      throw new AppError('Jumlah diterima harus lebih dari 0', 400);
+    }
 
-      const result = await prisma.$queryRawUnsafe<any[]>(`
-        EXEC dbo.usp_TerimaKirimanPengecer
-          @UserIdPengecer = ${data.pengecerId},
-          @KirimanId = ${data.kirimanId},
-          @JumlahDiterima = ${data.jumlahDiterima},
-          @TimestampDiterima = ${timestampParam}
+    const timestampStr = data.timestampDiterima
+      ? `'${data.timestampDiterima.toISOString()}'`
+      : 'NULL';
+
+    const result = await prisma.$transaction(async (tx: any) => {
+      // 1. Get shipment data with pupuk info
+      const [shipment] = await tx.$queryRaw<any[]>`
+        SELECT k.KirimanId, k.PupukId, k.UserIdDistributor, k.JumlahDikirim, p.JenisPupuk
+        FROM trans.KIRIMAN_PUPUK k
+        JOIN master.PUPUK p ON k.PupukId = p.PupukId
+        WHERE k.KirimanId = ${data.kirimanId} AND k.UserIdPengecer = ${data.pengecerId}
+      `;
+
+      if (!shipment) {
+        throw new AppError('Pengiriman tidak ditemukan', 400);
+      }
+
+      // 2. Determine status
+      const status = Number(data.jumlahDiterima) === Number(shipment.JumlahDikirim)
+        ? 'Diterima'
+        : 'Tidak Sesuai';
+
+      // 3. Update KIRIMAN_PUPUK
+      await tx.$executeRawUnsafe(`
+        UPDATE trans.KIRIMAN_PUPUK
+        SET Status = '${status}',
+            JumlahDiterima = ${data.jumlahDiterima},
+            TimestampDiterima = ${timestampStr}
+        WHERE KirimanId = ${data.kirimanId}
       `);
 
-      return result[0];
-    } catch (error: any) {
-      if (error.message.includes('tidak valid') || error.message.includes('melebihi')) {
-        throw new AppError(error.message, 400);
+      // 4. Get current stock
+      const [existingStock] = await tx.$queryRaw<any[]>`
+        SELECT Jumlah FROM trans.STOK
+        WHERE UserId = ${data.pengecerId} AND PupukId = ${shipment.PupukId}
+      `;
+
+      const jumlahAwal = existingStock ? Number(existingStock.Jumlah) : 0;
+      const jumlahAkhir = jumlahAwal + Number(data.jumlahDiterima);
+
+      // 5. Upsert STOK
+      if (existingStock) {
+        await tx.$executeRawUnsafe(`
+          UPDATE trans.STOK
+          SET Jumlah = ${jumlahAkhir}, Timestamp = GETDATE()
+          WHERE UserId = ${data.pengecerId} AND PupukId = ${shipment.PupukId}
+        `);
+      } else {
+        await tx.$executeRawUnsafe(`
+          INSERT INTO trans.STOK (UserId, PupukId, Jumlah, Timestamp)
+          VALUES (${data.pengecerId}, ${shipment.PupukId}, ${data.jumlahDiterima}, GETDATE())
+        `);
       }
-      throw error;
-    }
+
+      // 6. Insert RIWAYAT_STOK
+      await tx.$executeRawUnsafe(`
+        INSERT INTO trans.RIWAYAT_STOK (RiwayatId, UserId, PupukId, JumlahAwal, JumlahAkhir, TipePerubahan, Timestamp)
+        VALUES (
+          (SELECT ISNULL(MAX(RiwayatId), 0) + 1 FROM trans.RIWAYAT_STOK WITH (TABLOCKX)),
+          ${data.pengecerId},
+          ${shipment.PupukId},
+          ${jumlahAwal},
+          ${jumlahAkhir},
+          'Stok Masuk',
+          GETDATE()
+        )
+      `);
+
+      // 7. Get names for notification
+      const getNama = async (userId: number) => {
+        const [user] = await tx.$queryRaw<any[]>`
+          SELECT FirstName, MiddleName, LastName FROM master.[USER] WHERE UserId = ${userId}
+        `;
+        if (!user) return `User #${userId}`;
+        return [user.FirstName, user.MiddleName, user.LastName].filter(Boolean).join(' ') || `User #${userId}`;
+      };
+
+      const [namaDistributor, namaPengecer] = await Promise.all([
+        getNama(shipment.UserIdDistributor),
+        getNama(data.pengecerId),
+      ]);
+
+      const isSesuai = status === 'Diterima';
+      const statusNotif = isSesuai ? 'diterima sesuai' : 'diterima tidak sesuai';
+      const pesanPengecer = `Kiriman #${data.kirimanId} (${shipment.JenisPupuk}) ${statusNotif}. Dikirim: ${Number(shipment.JumlahDikirim).toFixed(2)} kg, Diterima: ${Number(data.jumlahDiterima).toFixed(2)} kg`;
+
+      // Truncate to fit NVARCHAR(100)
+      const maxLen = 100;
+      const truncatedPengecer = pesanPengecer.slice(0, maxLen);
+      const pesanDistributor = `Kiriman #${data.kirimanId} (${shipment.JenisPupuk}) ${statusNotif} oleh ${namaPengecer}. Dikirim: ${Number(shipment.JumlahDikirim).toFixed(2)} kg, Diterima: ${Number(data.jumlahDiterima).toFixed(2)} kg`;
+      const truncatedDistributor = pesanDistributor.slice(0, maxLen);
+
+      // Insert notification for pengecer
+      const [notifIdPengecer] = await tx.$queryRaw<any[]>`
+        SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
+      `;
+      await tx.$executeRawUnsafe(`
+        INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+        VALUES (${Number(notifIdPengecer.nextId)}, 'PENERIMAAN', 'Penerimaan Stok', ${esc(truncatedPengecer)}, 0, ${data.pengecerId}, GETDATE())
+      `);
+
+      // Insert notification for distributor
+      const [notifIdDistributor] = await tx.$queryRaw<any[]>`
+        SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
+      `;
+      await tx.$executeRawUnsafe(`
+        INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+        VALUES (${Number(notifIdDistributor.nextId)}, 'PENERIMAAN', 'Penerimaan Stok', ${esc(truncatedDistributor)}, 0, ${shipment.UserIdDistributor}, GETDATE())
+      `);
+
+      // 8. Insert LOG_AKTIVITAS
+      await tx.$executeRawUnsafe(`
+        INSERT INTO evt.LOG_AKTIVITAS (LogId, Aksi, Deskripsi, UserId, Timestamp)
+        VALUES (
+          (SELECT ISNULL(MAX(LogId), 0) + 1 FROM evt.LOG_AKTIVITAS WITH (TABLOCKX)),
+          'RECEIVE_SHIPMENT',
+          ${esc(`Pengecer menerima kiriman #${data.kirimanId} (${shipment.JenisPupuk}) - ${status}`)},
+          ${data.pengecerId},
+          GETDATE()
+        )
+      `);
+
+      // Format timestamp for display
+      const ts = data.timestampDiterima || new Date();
+      const dd = String(ts.getDate()).padStart(2, '0');
+      const mm = String(ts.getMonth() + 1).padStart(2, '0');
+      const yyyy = ts.getFullYear();
+      const hh = String(ts.getHours()).padStart(2, '0');
+      const min = String(ts.getMinutes()).padStart(2, '0');
+
+      return {
+        KirimanId: data.kirimanId,
+        JenisPupuk: shipment.JenisPupuk,
+        JumlahPupuk: Number(data.jumlahDiterima).toFixed(2),
+        WaktuPenerimaan: `${dd}/${mm}/${yyyy} | ${hh}:${min}`,
+        StatusPenerimaan: status,
+      };
+    });
+
+    return result;
   }
 
   /**
@@ -212,7 +347,7 @@ export class PengecerService {
 
       return result[0];
     } catch (error: any) {
-      throw error;
+      throw new AppError(extractSqlError(error.message), 400);
     }
   }
 
@@ -224,7 +359,8 @@ export class PengecerService {
       prisma.$queryRaw<any[]>`
         SELECT
           COUNT(*) AS totalPenerimaan,
-          COALESCE(SUM(JumlahDikirim), 0) AS totalJumlah
+          COALESCE(SUM(JumlahDikirim), 0) AS totalJumlah,
+          COALESCE(SUM(CASE WHEN Status = 'Tidak Sesuai' THEN 1 ELSE 0 END), 0) AS totalMismatch
         FROM trans.KIRIMAN_PUPUK
         WHERE UserIdPengecer = ${userId}
       `,
@@ -248,6 +384,7 @@ export class PengecerService {
       summary: {
         totalPenerimaan: Number(summary[0]?.totalPenerimaan ?? 0),
         totalJumlah: Number(summary[0]?.totalJumlah ?? 0),
+        totalMismatch: Number(summary[0]?.totalMismatch ?? 0),
       },
       receipts: (receipts || []).map(r => ({
         kirimanId: String(r.kirimanId ?? ''),
@@ -319,9 +456,12 @@ export class PengecerService {
 
     return (rows || []).map(r => ({
       notifikasiId: String(r.NotifikasiId ?? ''),
+      id: r.NotifikasiId,
       judul: r.JudulNotifikasi || r.Judul || '',
       pesan: r.PesanNotifikasi || r.Pesan || '',
       timestamp: r.TanggalNotifikasi || r.Timestamp || null,
+      statusDibaca: Boolean(r.StatusDibaca),
+      jenis: r.Jenis || r.JenisNotifikasi || '',
     }));
   }
 
@@ -407,12 +547,13 @@ export class PengecerService {
 
       return result[0];
     } catch (error: any) {
+      const msg = extractSqlError(error.message);
       if (
-        error.message.includes('Stok tidak mencukupi') ||
-        error.message.includes('Kuota tidak mencukupi') ||
-        error.message.includes('tidak valid')
+        msg.includes('Stok tidak mencukupi') ||
+        msg.includes('Kuota tidak mencukupi') ||
+        msg.includes('tidak valid')
       ) {
-        throw new AppError(error.message, 400);
+        throw new AppError(msg, 400);
       }
       throw error;
     }

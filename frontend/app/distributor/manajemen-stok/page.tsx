@@ -5,6 +5,7 @@ import Sidebar from '@/components/distributor/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import { Search, ArrowUpDown, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { api } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface StokItem {
   pupukId: number
@@ -74,12 +75,21 @@ export default function ManajemenStokDistributorPage() {
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
-
   }, [])
 
-  const uniqueFertilizers = fertilizers.length > 0
-    ? fertilizers
-    : [...new Map(stokData.map(s => [s.pupukId, { pupukId: s.pupukId, jenisPupuk: s.jenisPupuk }])).values()]
+  useEffect(() => {
+    let cancelled = false
+    api.get<{ pupukId: number; jenisPupuk: string }[]>('/api/pupuk')
+      .then(res => {
+        if (!cancelled && res.data) {
+          setFertilizers(res.data)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+
 
   // Filter + sort (client-side)
   let filtered = stokData.filter(s =>
@@ -143,7 +153,7 @@ export default function ManajemenStokDistributorPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb' }}>
-      <Sidebar notifCount={5} />
+      <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         {/* TopBar Dinamis */}
@@ -293,9 +303,9 @@ export default function ManajemenStokDistributorPage() {
               background: 'white', border: '1.5px solid #eee', borderRadius: '16px',
               padding: '20px 32px', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', minWidth: '180px',
             }}>
-              <p style={{ fontSize: '14px', color: '#555', fontWeight: 600, marginBottom: '8px' }}>Total Stok (Ton)</p>
+              <p style={{ fontSize: '14px', color: '#555', fontWeight: 600, marginBottom: '8px' }}>Total Stok</p>
               <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '48px', color: '#1a1a1a', lineHeight: 1 }}>
-                {totalTon}
+                {totalTon >= 1000 ? (totalTon / 1000).toFixed(2) + ' Ton' : totalTon.toFixed(2) + ' Kg'}
               </p>
             </div>
           </div>
@@ -325,7 +335,7 @@ export default function ManajemenStokDistributorPage() {
                 }}>
                   <span style={{ fontSize: '15px', color: '#333', textAlign: 'center', fontWeight: 500 }}>{row.pupukId}</span>
                   <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jenisPupuk}</span>
-                  <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jumlah} Ton</span>
+                  <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{formatStock(Number(row.jumlah))}</span>
                   <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>
                     {row.lastUpdated ? new Date(row.lastUpdated).toLocaleDateString('id-ID') : '-'}
                   </span>
@@ -426,7 +436,7 @@ export default function ManajemenStokDistributorPage() {
                         setShowPupukDropdown(true)
                       }}
                       onFocus={() => setShowPupukDropdown(true)}
-                      placeholder="Ketik untuk cari atau tambah baru"
+                      placeholder="Ketik untuk cari jenis pupuk"
                       style={{
                         width: '100%', padding: '11px 14px', borderRadius: '10px',
                         border: '1.5px solid #ddd', fontSize: '14px', fontFamily: 'var(--font-body)',
@@ -441,60 +451,37 @@ export default function ManajemenStokDistributorPage() {
                         boxShadow: '0 8px 24px rgba(0,0,0,0.1)', maxHeight: '200px', overflowY: 'auto',
                       }}>
                         {(() => {
-                          const list = uniqueFertilizers
                           const q = addPupukQuery.toLowerCase().trim()
                           const filtered = q
-                            ? list.filter(f => f.jenisPupuk.toLowerCase().includes(q))
-                            : list
+                            ? fertilizers.filter(f => f.jenisPupuk.toLowerCase().includes(q))
+                            : fertilizers
+                          if (filtered.length === 0) {
+                            return (
+                              <div style={{ padding: '10px 14px', fontSize: '14px', color: '#aaa' }}>
+                                Tidak ada data pupuk
+                              </div>
+                            )
+                          }
 
-                          return (
-                            <>
-                              {filtered.map(f => (
-                                <div
-                                  key={f.pupukId}
-                                  onClick={() => {
-                                    setAddPupukQuery(f.jenisPupuk)
-                                    setAddPupukId(f.pupukId)
-                                    setShowPupukDropdown(false)
-                                  }}
-                                  style={{
-                                    padding: '10px 14px', cursor: 'pointer', fontSize: '14px',
-                                    fontFamily: 'var(--font-body)', color: '#333',
-                                    borderBottom: '1px solid #f0f0f0',
-                                  }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = '#f5f9f5')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = '')}
-                                >
-                                  {f.jenisPupuk}
-                                </div>
-                              ))}
-
-                              {q && !list.some(f => f.jenisPupuk.toLowerCase() === q) && (
-                                <div
-                                  onClick={() => {
-                                    setAddPupukQuery(q)
-                                    setAddPupukId(null)
-                                    setShowPupukDropdown(false)
-                                  }}
-                                  style={{
-                                    padding: '10px 14px', cursor: 'pointer', fontSize: '14px',
-                                    fontFamily: 'var(--font-body)', color: '#1e6b1e', fontWeight: 600,
-                                    borderTop: filtered.length > 0 ? '1px solid #e5e5e5' : 'none',
-                                  }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = '#f0f7f0')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = '')}
-                                >
-                                  (+) Tambah "{q}" sebagai jenis baru
-                                </div>
-                              )}
-
-                              {!q && filtered.length === 0 && (
-                                <div style={{ padding: '10px 14px', fontSize: '14px', color: '#aaa' }}>
-                                  Tidak ada data pupuk
-                                </div>
-                              )}
-                            </>
-                          )
+                          return filtered.map(f => (
+                            <div
+                              key={f.pupukId}
+                              onClick={() => {
+                                setAddPupukQuery(f.jenisPupuk)
+                                setAddPupukId(f.pupukId)
+                                setShowPupukDropdown(false)
+                              }}
+                              style={{
+                                padding: '10px 14px', cursor: 'pointer', fontSize: '14px',
+                                fontFamily: 'var(--font-body)', color: '#333',
+                                borderBottom: '1px solid #f0f0f0',
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#f5f9f5')}
+                              onMouseLeave={e => (e.currentTarget.style.background = '')}
+                            >
+                              {f.jenisPupuk}
+                            </div>
+                          ))
                         })()}
                       </div>
                     )}
@@ -502,7 +489,7 @@ export default function ManajemenStokDistributorPage() {
 
                   <div>
                     <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a', marginBottom: '6px' }}>
-                      Jumlah Masuk (Ton)
+                      Jumlah Masuk (Kg)
                     </label>
                     <input
                       type="number"
@@ -543,7 +530,7 @@ export default function ManajemenStokDistributorPage() {
                       Batal
                     </button>
                     <button
-                      disabled={addingStock || !addPupukQuery.trim() || !addJumlah || parseFloat(addJumlah) <= 0}
+                      disabled={addingStock || !addPupukId || !addJumlah || parseFloat(addJumlah) <= 0}
                       onClick={async () => {
                         setAddError('')
                         const amount = parseFloat(addJumlah)
@@ -551,20 +538,14 @@ export default function ManajemenStokDistributorPage() {
                           setAddError('Jumlah harus lebih dari 0')
                           return
                         }
+                        if (!addPupukId) {
+                          setAddError('Pilih jenis pupuk terlebih dahulu')
+                          return
+                        }
                         setAddingStock(true)
                         try {
-                          let pupukId = addPupukId
-                          // If no existing pupuk selected, create new one first
-                          if (!pupukId) {
-                            const createRes = await api.post<{ pupukId: number; jenisPupuk: string }>('/api/pupuk', {
-                              jenisPupuk: addPupukQuery.trim(),
-                            })
-                            pupukId = createRes.data!.pupukId
-                            // Add to local list so dropdown updates
-                            setFertilizers(prev => [...prev, { pupukId: pupukId!, jenisPupuk: addPupukQuery.trim() }])
-                          }
                           await api.post('/api/stock', {
-                            pupukId,
+                            pupukId: addPupukId,
                             jumlah: amount,
                           })
                           setShowAddModal(false)
@@ -585,9 +566,9 @@ export default function ManajemenStokDistributorPage() {
                       }}
                       style={{
                         flex: 1, padding: '12px', borderRadius: '10px', border: 'none',
-                        background: addingStock || !addPupukQuery.trim() || !addJumlah || parseFloat(addJumlah) <= 0 ? '#6B8F6B' : '#1e6b1e',
+                        background: addingStock || !addPupukId || !addJumlah || parseFloat(addJumlah) <= 0 ? '#6B8F6B' : '#1e6b1e',
                         color: 'white', fontFamily: 'var(--font-display)', fontWeight: 700,
-                        fontSize: '14px', cursor: addingStock || !addPupukQuery.trim() || !addJumlah || parseFloat(addJumlah) <= 0 ? 'not-allowed' : 'pointer',
+                        fontSize: '14px', cursor: addingStock || !addPupukId || !addJumlah || parseFloat(addJumlah) <= 0 ? 'not-allowed' : 'pointer',
                       }}
                     >
                       {addingStock ? 'Menyimpan...' : 'Simpan'}
@@ -634,13 +615,13 @@ export default function ManajemenStokDistributorPage() {
                       border: '1.5px solid #e5e5e5', fontSize: '14px', fontFamily: 'var(--font-body)',
                       background: '#f5f5f5', color: '#555',
                     }}>
-                      {editingStock.jumlah} Ton
+                      {formatStock(Number(editingStock.jumlah))}
                     </div>
                   </div>
 
                   <div>
                     <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#1a1a1a', marginBottom: '6px' }}>
-                      Jumlah Penambahan (Ton)
+                      Jumlah Penambahan (Kg)
                     </label>
                     <input
                       type="number"

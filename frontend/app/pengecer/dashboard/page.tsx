@@ -5,6 +5,7 @@ import Sidebar from '@/components/pengecer/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 import Link from 'next/link'
 import { api } from '@/lib/api'
+import { formatStock } from '@/lib/format'
 
 interface DashboardData {
   summary: {
@@ -42,9 +43,11 @@ interface DashboardData {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const ok = status === 'Berhasil' || status === 'Sesuai'
+  const bg = status === 'Dikirim' ? '#eab308'
+    : status === 'Tidak Sesuai' ? '#dc2626'
+    : '#16a34a'
   return (
-    <span style={{ padding: '5px 18px', borderRadius: '999px', background: ok ? '#72A94F' : '#BA1A1A', color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>
+    <span style={{ display: 'inline-block', padding: '5px 0', borderRadius: '999px', background: bg, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', width: '120px', textAlign: 'center' }}>
       {status}
     </span>
   )
@@ -84,10 +87,13 @@ export default function DashboardPage() {
   }
 
   const summary = data?.summary || {}
+  const stockTotal = Number(pick(summary, 'TotalStokKeseluruhan', 'totalStokKeseluruhan', 'totalStock'))
+  const sisaKuota = Number(pick(summary, 'TotalSisaKuotaPetani', 'totalSisaKuotaPetani', 'totalSisaKuota'))
+  const petaniTotal = Number(pick(summary, 'TotalPetaniTerdaftar', 'totalPetaniTerdaftar', 'totalPetani'))
   const statCards = [
-    { label: 'Total Stok Keseluruhan', value: pick(summary, 'TotalStokKeseluruhan', 'totalStokKeseluruhan', 'totalStock'), unit: 'Ton' },
-    { label: 'Total Petani Terdaftar',  value: pick(summary, 'TotalPetaniTerdaftar', 'totalPetaniTerdaftar', 'totalPetani'),  unit: '' },
-    { label: 'Total Sisa Kuota Petani', value: pick(summary, 'TotalSisaKuotaPetani', 'totalSisaKuotaPetani', 'totalSisaKuota'), unit: 'Ton' },
+    { label: 'Total Stok Keseluruhan', value: formatStock(stockTotal) },
+    { label: 'Total Petani Terdaftar',  value: String(petaniTotal) },
+    { label: 'Total Sisa Kuota Petani', value: formatStock(sisaKuota) },
   ]
 
   const toActivityRow = (item: any, kind: 'receipt' | 'redemption') => {
@@ -96,7 +102,7 @@ export default function DashboardPage() {
         id: item.KirimanId || item.kirimanId || '-',
         date: (item.TimestampDikirim || item.timestampDikirim) ? new Date(item.TimestampDikirim || item.timestampDikirim).toLocaleDateString('id-ID') : '-',
         jenis: item.JenisPupuk || item.jenisPupuk || '-',
-        jumlah: `${item.JumlahDikirim ?? item.jumlahDikirim ?? 0} kg`,
+        jumlah: formatStock(item.JumlahDikirim ?? item.jumlahDikirim ?? 0),
         status: item.Status || item.status || '-',
       }
     }
@@ -104,7 +110,7 @@ export default function DashboardPage() {
       id: item.PenebusanId || item.penebusanId || item.tebusanId || '-',
       date: (item.TimestampPenebusan || item.timestampPenebusan) ? new Date(item.TimestampPenebusan || item.timestampPenebusan).toLocaleDateString('id-ID') : '-',
       jenis: item.JenisPupuk || item.jenisPupuk || '-',
-      jumlah: `${item.Jumlah ?? item.jumlah ?? 0} kg`,
+      jumlah: formatStock(item.Jumlah ?? item.jumlah ?? 0),
       status: item.Status || item.status || '-',
     }
   }
@@ -113,7 +119,7 @@ export default function DashboardPage() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb' }}>
       <Sidebar />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
-        <TopBar pageCode="MK-DASH-02" />
+        <TopBar />
         <main style={{ flex: 1, padding: '28px 36px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {loading ? (
             <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Memuat...</div>
@@ -129,12 +135,11 @@ export default function DashboardPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-                {statCards.map(({ label, value, unit }) => (
+                {statCards.map(({ label, value }) => (
                   <div key={label} style={{ background: 'white', borderRadius: '16px', padding: '28px 24px', border: '1px solid #eee', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                     <p style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>{label}</p>
-                    <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '44px', color: '#1a1a1a', lineHeight: 1 }}>
-                      {value}{' '}
-                      {unit && <span style={{ fontSize: '18px', fontWeight: 500, color: '#888' }}>{unit}</span>}
+                    <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '32px', color: '#1a1a1a', lineHeight: 1 }}>
+                      {value}
                     </p>
                   </div>
                 ))}
