@@ -443,6 +443,7 @@ export class DistributorService {
 
       return (rows || []).map(r => ({
         notifikasiId: String(r.NotifikasiId ?? ''),
+        id: r.NotifikasiId,
         judul: r.JudulNotifikasi || r.Judul || '',
         pesan: r.PesanNotifikasi || r.Pesan || '',
         timestamp: r.TanggalNotifikasi || r.Timestamp || null,
