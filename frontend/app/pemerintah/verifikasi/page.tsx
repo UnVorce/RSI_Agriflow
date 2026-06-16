@@ -267,7 +267,7 @@ export default function VerifikasiPage() {
                     <span>
                       {u.registrationProof ? (
                         <a
-                          href={u.registrationProof.startsWith('http') ? u.registrationProof : `${process.env.NEXT_PUBLIC_API_URL || ''}/uploads/${u.registrationProof.replace(/^\\//, '')}`}
+                          href={u.registrationProof.startsWith('http') ? u.registrationProof : `${process.env.NEXT_PUBLIC_API_URL || ''}/uploads/${u.registrationProof.startsWith('/') ? u.registrationProof.slice(1) : u.registrationProof}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#1e6b1e', fontSize: '13px', fontWeight: 500 }}
