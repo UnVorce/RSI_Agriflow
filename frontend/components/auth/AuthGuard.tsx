@@ -26,7 +26,7 @@ export function AuthGuard({ children, allowedRole }: AuthGuardProps) {
       const dashboardMap: Record<string, string> = {
         DISTRIBUTOR: '/distributor/dashboard',
         PENGECER: '/pengecer/dashboard',
-        PEMERINTAH: '/',
+        PEMERINTAH: '/pemerintah/dashboard',
       }
       router.replace(dashboardMap[user.role] || '/')
     }
