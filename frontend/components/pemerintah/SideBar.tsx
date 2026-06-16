@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -7,22 +8,32 @@ import {
   Home,
   UserCheck,
   AlertTriangle,
+  Bell,
   HelpCircle,
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { api } from '@/lib/api'
 
 const navItems = [
   { label: 'Dashboard',          href: '/pemerintah/dashboard',  icon: Home },
   { label: 'Verifikasi Pendaftar', href: '/pemerintah/verifikasi', icon: UserCheck },
+  { label: 'Notifikasi',         href: '/pemerintah/notifikasi', icon: Bell },
   { label: 'Deteksi Anomali',    href: '/pemerintah/anomali',    icon: AlertTriangle },
   { label: 'Bantuan & Keluhan',  href: '/pemerintah/bantuan',    icon: HelpCircle },
 ]
 
 export default function SidebarPemerintah() {
+  const [notifCount, setNotifCount] = useState(0)
   const pathname = usePathname()
   const { logout } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    api.get<{ count: number }>('/api/notifications/unread-count')
+      .then(res => { if (res.data) setNotifCount(res.data.count) })
+      .catch(() => {})
+  }, [])
 
   const handleLogout = async () => {
     await logout()
@@ -77,7 +88,7 @@ export default function SidebarPemerintah() {
       {/* Logo */}
       <div style={{ padding: '24px 20px 32px' }}>
         <Link href="/">
-          <Image src="/logo.png" alt="AgriFlow" width={140} height={40} style={{ objectFit: 'contain' }} />
+          <Image src="/LogoPutih.png" alt="AgriFlow" width={140} height={40} style={{ objectFit: 'contain' }} />
         </Link>
       </div>
 
@@ -87,6 +98,11 @@ export default function SidebarPemerintah() {
           <Link key={href} href={href} style={linkStyle(href)}>
             <Icon size={20} strokeWidth={1.8} />
             <span style={{ flex: 1 }}>{label}</span>
+            {label === 'Notifikasi' && notifCount > 0 && (
+              <span style={{ background: '#BA1A1A', color: 'white', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px' }}>
+                {notifCount}
+              </span>
+            )}
             {activeBar(href)}
           </Link>
         ))}
