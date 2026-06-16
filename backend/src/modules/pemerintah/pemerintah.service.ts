@@ -1,5 +1,11 @@
 import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
+import redisClient from '../../config/redis';
+
+function esc(val: string | null | undefined): string {
+  if (val == null) return 'NULL';
+  return `'${val.replace(/'/g, "''")}'`;
+}
 
 /**
  * Pemerintah (Government) Service
@@ -31,18 +37,18 @@ export class PemerintahService {
     tahunAkhir?: number;
     pupukId?: number;
   }) {
-    const provinsiParam = filters.provinsi ? `'${filters.provinsi}'` : 'NULL';
-    const tahunAwalParam = filters.tahunAwal || 'NULL';
-    const tahunAkhirParam = filters.tahunAkhir || 'NULL';
-    const pupukIdParam = filters.pupukId || 'NULL';
+    const cacheKey = `dashboard:pemerintah:${JSON.stringify(filters)}`;
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch { /* Redis unavailable, skip cache */ }
 
-    // Run each result set as separate lightweight queries instead of one heavy SP
     const whereClause = `
       pp.Status = 'Berhasil'
       AND p.Status = 'Aktif'
       ${filters.provinsi ? `AND kp.Provinsi = '${filters.provinsi}'` : ''}
-      ${filters.tahunAwal ? `AND YEAR(pp.TimestampPenebusan) >= ${filters.tahunAwal}` : ''}
-      ${filters.tahunAkhir ? `AND YEAR(pp.TimestampPenebusan) <= ${filters.tahunAkhir}` : ''}
+      ${filters.tahunAwal ? `AND pp.TimestampPenebusan >= '${filters.tahunAwal}-01-01'` : ''}
+      ${filters.tahunAkhir ? `AND pp.TimestampPenebusan < DATEADD(YEAR, 1, '${filters.tahunAkhir}-01-01')` : ''}
       ${filters.pupukId ? `AND pp.PupukId = ${filters.pupukId}` : ''}
     `;
 
@@ -52,14 +58,14 @@ export class PemerintahService {
       JOIN ref.KODE_POS kp ON p.KodePos = kp.KodePosId
     `;
 
-    const [totalAbsorbedRes, top3Res, trendRes, sectorsRes, kuotaRes] = await Promise.all([
+    const [totalAbsorbedRes, provRes, trendRes, sectorsRes, kuotaRes] = await Promise.all([
       prisma.$queryRawUnsafe<any[]>(`
         SELECT CAST(ISNULL(SUM(pp.Jumlah), 0) / 1000 AS DECIMAL(18,2)) AS TotalTerserapTon
         ${joinClause}
         WHERE ${whereClause}
       `),
       prisma.$queryRawUnsafe<any[]>(`
-        SELECT TOP 3 kp.Provinsi, ISNULL(SUM(pp.Jumlah), 0) AS TotalPupuk
+        SELECT kp.Provinsi, ISNULL(SUM(pp.Jumlah), 0) AS TotalPupuk
         ${joinClause}
         WHERE ${whereClause}
         GROUP BY kp.Provinsi
@@ -94,20 +100,22 @@ export class PemerintahService {
 
     const totalTon = Number(totalAbsorbedRes[0]?.TotalTerserapTon ?? 0);
     const totalSisaKuota = Number(kuotaRes[0]?.TotalSisaKuota ?? 0);
-    const totalDitebus = totalTon * 1000; // convert back from ton to kg
+    const totalDitebus = totalTon * 1000;
     const totalAlokasi = totalDitebus + totalSisaKuota;
     const realisasiPersen = totalAlokasi > 0
       ? ((totalDitebus / totalAlokasi) * 100).toFixed(2)
       : '0.00';
 
-    return {
-      mapByProvince: [],
+    const allProvinces = provRes.map((r: any) => ({
+      Provinsi: r.Provinsi,
+      TotalPupuk: Number(r.TotalPupuk),
+    }));
+
+    const result = {
+      mapByProvince: allProvinces,
       totalAbsorbed: { TotalTerserapTon: String(totalTon) },
       realizationPercent: { RealisasiPersen: realisasiPersen },
-      topProvinces: top3Res.map((r: any) => ({
-        Provinsi: r.Provinsi,
-        TotalPupuk: Number(r.TotalPupuk),
-      })),
+      topProvinces: allProvinces.slice(0, 3),
       monthlyTrend: trendRes.map((r: any) => ({
         Tahun: Number(r.Tahun),
         Bulan: Number(r.Bulan),
@@ -118,6 +126,12 @@ export class PemerintahService {
         TotalPupuk: Number(r.TotalPupuk),
       })),
     };
+
+    try {
+      await redisClient.setEx(cacheKey, 300, JSON.stringify(result));
+    } catch { /* Redis unavailable, skip cache */ }
+
+    return result;
   }
 
   /**
@@ -138,62 +152,151 @@ export class PemerintahService {
   }
 
   /**
-   * Get pending users for verification
-   * SP: dbo.usp_GetPemerintahVerifikasiPendaftar
+   * Get pending users for verification with pagination
    */
-  async getPendingUsers(pageNumber: number = 1, pageSize: number = 6) {
-    const result = await prisma.$queryRawUnsafe<any>(`
-      EXEC dbo.usp_GetPemerintahVerifikasiPendaftar
-        @PageNumber = ${pageNumber},
-        @PageSize = ${pageSize}
-    `);
+  async getPendingUsers(pageNumber: number = 1, pageSize: number = 10) {
+    const skip = (pageNumber - 1) * pageSize;
+
+    const [users, totalCount, totalAll, totalAktif, totalDitolak] = await Promise.all([
+      prisma.user.findMany({
+        where: { Status: 'Pending' },
+        select: {
+          UserId: true,
+          FirstName: true,
+          MiddleName: true,
+          LastName: true,
+          Email: true,
+          RegistrationProof: true,
+          Role: { select: { RoleName: true } },
+        },
+        orderBy: { CreatedAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      prisma.user.count({ where: { Status: 'Pending' } }),
+      prisma.user.count(),
+      prisma.user.count({ where: { Status: 'Active' } }),
+      prisma.user.count({ where: { Status: 'Rejected' } }),
+    ]);
+
+    const pendingUsers = users.map((u, idx) => ({
+      No: skip + idx + 1,
+      UserId: u.UserId,
+      NamaLengkap: [u.FirstName, u.MiddleName, u.LastName].filter(Boolean).join(' '),
+      Email: u.Email,
+      Role: u.Role.RoleName,
+      RegistrationProof: u.RegistrationProof,
+      TotalRows: totalCount,
+    }));
 
     return {
-      summary: result[0],
-      pendingUsers: result[1] || [],
+      summary: [{ Total: totalAll, TotalAktif: totalAktif, TotalDitolak: totalDitolak }],
+      pendingUsers,
     };
   }
 
   /**
    * Approve pending user
-   * SP: dbo.usp_ApproveUser
    */
   async approveUser(userId: number, approverId: number) {
-    try {
-      await prisma.$queryRawUnsafe(`
-        EXEC dbo.usp_ApproveUser
-          @UserIdPenyetuju = ${approverId},
-          @UserId = ${userId}
-      `);
+    const user = await prisma.user.findUnique({
+      where: { UserId: userId },
+    });
 
-      return { message: 'User berhasil disetujui' };
-    } catch (error: any) {
-      if (error.message.includes('tidak ditemukan') || error.message.includes('tidak Pending')) {
-        throw new AppError(error.message, 400);
-      }
-      throw error;
+    if (!user) {
+      throw new AppError('Pengguna tidak ditemukan', 404);
     }
+
+    if (user.Status !== 'Pending') {
+      throw new AppError('Pengguna sudah diproses', 400);
+    }
+
+    await prisma.user.update({
+      where: { UserId: userId },
+      data: {
+        Status: 'Active',
+        UserIdPenyetuju: approverId,
+        TimestampDisetujui: new Date(),
+      },
+    });
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO evt.LOG_AKTIVITAS (LogId, Aksi, Deskripsi, UserId, Timestamp)
+      VALUES (
+        (SELECT ISNULL(MAX(LogId), 0) + 1 FROM evt.LOG_AKTIVITAS WITH (TABLOCKX)),
+        'APPROVE_USER',
+        ${esc(`Pengguna disetujui: ${user.Email}`)},
+        ${approverId},
+        GETDATE()
+      )
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+      VALUES (
+        (SELECT ISNULL(MAX(NotifikasiId), 0) + 1 FROM evt.NOTIFIKASI WITH (TABLOCKX)),
+        'APPROVAL',
+        'Akun Disetujui',
+        'Akun Anda telah disetujui dan sekarang aktif.',
+        0,
+        ${userId},
+        GETDATE()
+      )
+    `);
+
+    return { message: 'User berhasil disetujui' };
   }
 
   /**
    * Reject pending user
-   * SP: dbo.usp_RejectUser
    */
   async rejectUser(userId: number, approverId: number) {
-    try {
-      await prisma.$queryRawUnsafe(`
-        EXEC dbo.usp_RejectUser
-          @UserIdPemerintah = ${approverId},
-          @UserId = ${userId}
-      `);
+    const user = await prisma.user.findUnique({
+      where: { UserId: userId },
+    });
 
-      return { message: 'User berhasil ditolak' };
-    } catch (error: any) {
-      if (error.message.includes('tidak ditemukan') || error.message.includes('tidak Pending')) {
-        throw new AppError(error.message, 400);
-      }
-      throw error;
+    if (!user) {
+      throw new AppError('Pengguna tidak ditemukan', 404);
     }
+
+    if (user.Status !== 'Pending') {
+      throw new AppError('Pengguna sudah diproses', 400);
+    }
+
+    await prisma.user.update({
+      where: { UserId: userId },
+      data: {
+        Status: 'Rejected',
+        UserIdPenyetuju: approverId,
+        TimestampDisetujui: new Date(),
+      },
+    });
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO evt.LOG_AKTIVITAS (LogId, Aksi, Deskripsi, UserId, Timestamp)
+      VALUES (
+        (SELECT ISNULL(MAX(LogId), 0) + 1 FROM evt.LOG_AKTIVITAS WITH (TABLOCKX)),
+        'REJECT_USER',
+        ${esc(`Pengguna ditolak: ${user.Email}`)},
+        ${approverId},
+        GETDATE()
+      )
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+      VALUES (
+        (SELECT ISNULL(MAX(NotifikasiId), 0) + 1 FROM evt.NOTIFIKASI WITH (TABLOCKX)),
+        'REJECTION',
+        'Akun Ditolak',
+        'Maaf, akun Anda telah ditolak.',
+        0,
+        ${userId},
+        GETDATE()
+      )
+    `);
+
+    return { message: 'User berhasil ditolak' };
   }
 
   /**

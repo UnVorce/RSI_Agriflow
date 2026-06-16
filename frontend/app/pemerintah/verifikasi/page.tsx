@@ -24,7 +24,7 @@ interface SummaryData {
   totalRows: number
 }
 
-const PAGE_SIZE = 6
+const PAGE_SIZE = 10
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function VerifikasiPage() {
@@ -48,7 +48,7 @@ export default function VerifikasiPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get<any>('/api/auth/pending', {
+      const res = await api.get<any>('/api/pemerintah/users/pending', {
         page: String(p),
         pageSize: String(PAGE_SIZE),
       })
@@ -106,11 +106,11 @@ export default function VerifikasiPage() {
     fetchData(page)
   }, [page, fetchData])
 
-  // TS-006: PATCH /api/auth/approve/:id
+  // TS-006: POST /api/pemerintah/users/:userId/approve
   const handleApprove = async (userId: number) => {
     setActionLoading(userId)
     try {
-      await api.patch(`/api/auth/approve/${userId}`)
+      await api.post(`/api/pemerintah/users/${userId}/approve`)
       showToast('User berhasil disetujui', 'ok')
       fetchData(page)
     } catch (err) {
@@ -121,11 +121,11 @@ export default function VerifikasiPage() {
     }
   }
 
-  // TS-007: PATCH /api/auth/reject/:id
+  // TS-007: POST /api/pemerintah/users/:userId/reject
   const handleReject = async (userId: number) => {
     setActionLoading(userId)
     try {
-      await api.patch(`/api/auth/reject/${userId}`)
+      await api.post(`/api/pemerintah/users/${userId}/reject`)
       showToast('User berhasil ditolak', 'ok')
       fetchData(page)
     } catch (err) {
