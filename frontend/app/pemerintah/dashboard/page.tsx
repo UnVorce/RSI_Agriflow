@@ -131,9 +131,19 @@ export default function DashboardPemerintahPage() {
               raw.realisasiPersen ??
               '0'
             ),
-            top3Provinsi: raw.topProvinces ?? raw.top3Provinsi ?? [],
-            trenBulanan: raw.monthlyTrend ?? raw.trenBulanan ?? [],
-            top3Sektor: raw.topSectors ?? raw.top3Sektor ?? [],
+            top3Provinsi: (raw.topProvinces ?? raw.top3Provinsi ?? []).map((p: any) => ({
+              provinsi: p.Provinsi ?? p.provinsi ?? '',
+              totalPupuk: Number(p.TotalPupuk ?? p.totalPupuk ?? 0),
+            })),
+            trenBulanan: (raw.monthlyTrend ?? raw.trenBulanan ?? []).map((t: any) => ({
+              tahun: Number(t.Tahun ?? t.tahun ?? 0),
+              bulan: Number(t.Bulan ?? t.bulan ?? 0),
+              totalPupuk: Number(t.TotalPupuk ?? t.totalPupuk ?? 0),
+            })),
+            top3Sektor: (raw.topSectors ?? raw.top3Sektor ?? []).map((s: any) => ({
+              sektor: s.Sektor ?? s.sektor ?? '',
+              totalPupuk: Number(s.TotalPupuk ?? s.totalPupuk ?? 0),
+            })),
           }
           setData(normalized)
           setError('')

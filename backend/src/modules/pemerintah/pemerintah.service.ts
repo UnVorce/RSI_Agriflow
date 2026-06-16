@@ -15,7 +15,10 @@ export class PemerintahService {
       EXEC dbo.usp_GetPemerintahNotifikasiTop3 @UserId = ${userId}
     `);
 
-    return result;
+    return result.map((r: any) => ({
+      ...r,
+      NotifikasiId: r.NotifikasiId !== undefined ? String(r.NotifikasiId) : undefined,
+    }));
   }
 
   /**
@@ -33,21 +36,87 @@ export class PemerintahService {
     const tahunAkhirParam = filters.tahunAkhir || 'NULL';
     const pupukIdParam = filters.pupukId || 'NULL';
 
-    const result = await prisma.$queryRawUnsafe<any>(`
-      EXEC dbo.usp_GetPemerintahDashboard
-        @Provinsi = ${provinsiParam},
-        @TahunAwal = ${tahunAwalParam},
-        @TahunAkhir = ${tahunAkhirParam},
-        @PupukId = ${pupukIdParam}
-    `);
+    // Run each result set as separate lightweight queries instead of one heavy SP
+    const whereClause = `
+      pp.Status = 'Berhasil'
+      AND p.Status = 'Aktif'
+      ${filters.provinsi ? `AND kp.Provinsi = '${filters.provinsi}'` : ''}
+      ${filters.tahunAwal ? `AND YEAR(pp.TimestampPenebusan) >= ${filters.tahunAwal}` : ''}
+      ${filters.tahunAkhir ? `AND YEAR(pp.TimestampPenebusan) <= ${filters.tahunAkhir}` : ''}
+      ${filters.pupukId ? `AND pp.PupukId = ${filters.pupukId}` : ''}
+    `;
+
+    const joinClause = `
+      FROM trans.PENEBUSAN_PUPUK pp
+      JOIN master.PETANI p ON pp.PetaniId = p.PetaniId
+      JOIN ref.KODE_POS kp ON p.KodePos = kp.KodePosId
+    `;
+
+    const [totalAbsorbedRes, top3Res, trendRes, sectorsRes, kuotaRes] = await Promise.all([
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT CAST(ISNULL(SUM(pp.Jumlah), 0) / 1000 AS DECIMAL(18,2)) AS TotalTerserapTon
+        ${joinClause}
+        WHERE ${whereClause}
+      `),
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT TOP 3 kp.Provinsi, ISNULL(SUM(pp.Jumlah), 0) AS TotalPupuk
+        ${joinClause}
+        WHERE ${whereClause}
+        GROUP BY kp.Provinsi
+        ORDER BY TotalPupuk DESC
+      `),
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT TOP 24
+          YEAR(pp.TimestampPenebusan) AS Tahun,
+          MONTH(pp.TimestampPenebusan) AS Bulan,
+          SUM(pp.Jumlah) AS TotalPupuk
+        ${joinClause}
+        WHERE ${whereClause}
+        GROUP BY YEAR(pp.TimestampPenebusan), MONTH(pp.TimestampPenebusan)
+        ORDER BY Tahun DESC, Bulan DESC
+      `),
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT TOP 3 p.Sektor, SUM(pp.Jumlah) AS TotalPupuk
+        ${joinClause}
+        WHERE ${whereClause}
+        AND p.Sektor IS NOT NULL
+        GROUP BY p.Sektor
+        ORDER BY TotalPupuk DESC
+      `),
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT ISNULL(SUM(kp2.SisaKuota), 0) AS TotalSisaKuota
+        FROM master.KUOTA_PETANI kp2
+        JOIN master.PETANI p2 ON kp2.PetaniId = p2.PetaniId
+        WHERE p2.Status = 'Aktif'
+        ${filters.pupukId ? `AND kp2.PupukId = ${filters.pupukId}` : ''}
+      `),
+    ]);
+
+    const totalTon = Number(totalAbsorbedRes[0]?.TotalTerserapTon ?? 0);
+    const totalSisaKuota = Number(kuotaRes[0]?.TotalSisaKuota ?? 0);
+    const totalDitebus = totalTon * 1000; // convert back from ton to kg
+    const totalAlokasi = totalDitebus + totalSisaKuota;
+    const realisasiPersen = totalAlokasi > 0
+      ? ((totalDitebus / totalAlokasi) * 100).toFixed(2)
+      : '0.00';
 
     return {
-      mapByProvince: result[0] || [],
-      totalAbsorbed: result[1],
-      realizationPercent: result[2],
-      topProvinces: result[3] || [],
-      monthlyTrend: result[4] || [],
-      topSectors: result[5] || [],
+      mapByProvince: [],
+      totalAbsorbed: { TotalTerserapTon: String(totalTon) },
+      realizationPercent: { RealisasiPersen: realisasiPersen },
+      topProvinces: top3Res.map((r: any) => ({
+        Provinsi: r.Provinsi,
+        TotalPupuk: Number(r.TotalPupuk),
+      })),
+      monthlyTrend: trendRes.map((r: any) => ({
+        Tahun: Number(r.Tahun),
+        Bulan: Number(r.Bulan),
+        TotalPupuk: Number(r.TotalPupuk),
+      })),
+      topSectors: sectorsRes.map((r: any) => ({
+        Sektor: r.Sektor,
+        TotalPupuk: Number(r.TotalPupuk),
+      })),
     };
   }
 
@@ -62,7 +131,10 @@ export class PemerintahService {
         @PageNumber = ${pageNumber}
     `);
 
-    return result;
+    return result.map((r: any) => ({
+      ...r,
+      TotalRows: r.TotalRows !== undefined ? Number(r.TotalRows) : undefined,
+    }));
   }
 
   /**
@@ -133,6 +205,11 @@ export class PemerintahService {
       EXEC dbo.usp_GetPemerintahBantuan @PageNumber = ${pageNumber}
     `);
 
-    return result;
+    // Serialize BigInt fields to string/number
+    return result.map((r: any) => ({
+      ...r,
+      No: r.No !== undefined ? Number(r.No) : undefined,
+      TotalRows: r.TotalRows !== undefined ? Number(r.TotalRows) : undefined,
+    }));
   }
 }
