@@ -22,7 +22,7 @@ export default function HeroSection() {
           position: 'absolute',
           inset: 0,
           backgroundImage:
-            "url('utama.png')",
+            "url('/utama.png')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           filter: 'brightness(0.55)',

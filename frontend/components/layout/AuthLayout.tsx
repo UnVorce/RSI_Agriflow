@@ -21,7 +21,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         style={{
           position: 'fixed',
           inset: 0,
-          backgroundImage: "url('utama.png')",
+          backgroundImage: "url('/utama.png')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           filter: 'brightness(0.6)',
