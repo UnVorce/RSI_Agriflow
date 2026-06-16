@@ -258,7 +258,7 @@ export default function TambahPengirimanPage() {
                       { label: 'ID Pengecer',      val: idKonfirm },
                       { label: 'Nama Tujuan',      val: pengecer?.nama },
                       { label: 'Jenis Pupuk',      val: jenis },
-                      { label: 'Jumlah Pupuk',     val: `{formatStock(parseFloat(jumlah) || 0)}` },
+                      { label: 'Jumlah Pupuk',     val: formatStock(parseFloat(jumlah) || 0) },
                       { label: 'Waktu Pengiriman', val: waktuKonfirmasi },
                     ].map(({ label, val }) => (
                       <div key={label} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '6px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
