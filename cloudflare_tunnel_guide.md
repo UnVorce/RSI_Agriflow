@@ -15,12 +15,17 @@ Berikut adalah panduan teknis langkah demi langkahnya:
 
 ## TAHAP 1: Menyiapkan Backend Lokal
 
-1. Pastikan SQL Server sudah berjalan normal di komputer Anda.
-2. Jalankan Backend Node.js/Express Anda seperti biasa. Misalnya berjalan di `http://localhost:3001`.
-3. **PENTING (Update CORS):** Ubah file konfigurasi CORS di backend Express Anda agar menerima *request* dari Vercel:
+1. **Pastikan Database Berjalan:** Pastikan SQL Server sudah berjalan normal di komputer Anda. (Bisa dicek melalui SQL Server Management Studio).
+2. **Konfigurasi Environment Backend:** Buka file `.env` di folder `backend/` Anda. Pastikan port dan URL database sudah dikonfigurasi dengan benar, contoh:
+   ```env
+   PORT=3001
+   DATABASE_URL="sqlserver://localhost:1433;database=AgriflowDB;integratedSecurity=true;trustServerCertificate=true;"
+   ```
+3. **Jalankan Backend:** Jalankan backend Node.js/Express Anda (misalnya dengan `npm run start` atau `npm run dev`). Pastikan aplikasi menyala tanpa *error* di `http://localhost:3001`.
+4. **PENTING (Update CORS):** Ubah konfigurasi CORS (di `main.ts` atau `app.ts`) agar backend mau menerima *request* dari Vercel. Jika tidak, browser akan memblokirnya:
    ```typescript
    app.use(cors({
-     // Nanti ganti domain vercel ini dengan URL Frontend asli Anda
+     // Ganti domain vercel ini dengan URL Frontend asli Anda nanti
      origin: ['http://localhost:3000', 'https://agriflow.vercel.app'], 
      credentials: true
    }));
@@ -37,9 +42,10 @@ Langkah ini akan membuatkan URL publik (HTTPS) yang terhubung langsung ke `local
 3. Klik tombol **Create a tunnel**.
 4. Pilih **Cloudflared** lalu beri nama tunnel Anda (misalnya: `agriflow-api-lokal`), lalu klik Save.
 5. Anda akan masuk ke halaman **Install and run a connector**.
-   * Pilih sistem operasi komputer kantor Anda (Windows/Linux/Mac).
+   * Pilih sistem operasi komputer kantor Anda (Windows).
    * Anda akan diberikan *command* (perintah terminal) untuk di-copy.
-   * Buka terminal/Command Prompt di komputer Anda (Run as Administrator), lalu *paste* perintah tersebut.
+   * Buka **Command Prompt (CMD) atau PowerShell** di komputer Anda (Wajib **Run as Administrator**), lalu *paste* perintah tersebut. Perintah ini akan mengunduh dan memasang `cloudflared` sebagai Windows Service.
+   * **Info Penting:** Karena berjalan sebagai *Service*, Tunnel ini akan **otomatis menyala sendiri** (Auto-start) setiap kali komputer di-restart atau dihidupkan, meskipun Anda belum login ke Windows.
    * Tunggu sampai status konektor di *dashboard* Cloudflare berubah menjadi **Connected**.
 6. Klik **Next**. Di halaman *Route Traffic*:
    * **Public Hostname**: Isi dengan domain/subdomain Anda (misal `api.agriflow.id` atau biarkan Cloudflare memberikan domain default).
@@ -65,7 +71,23 @@ Sekarang, coba buka URL Publik dari Cloudflare Tunnel tersebut di HP/browser lai
 ---
 
 ### Kesimpulan
-Dengan cara ini:
-- Jika komputer kantor Anda dimatikan, Frontend (Vercel) tetap bisa dibuka, namun *user* tidak akan bisa menarik/mengubah data.
-- Saat komputer kantor dinyalakan lagi, Cloudflare Tunnel akan otomatis menyambung (*reconnect*), dan aplikasi akan langsung berfungsi normal kembali tanpa perlu setting ulang.
-- Tidak ada orang luar yang bisa langsung mengakses SQL Server Anda. Sangat aman.
+Dengan arsitektur ini:
+- Jika komputer kantor Anda dimatikan/mati lampu, web Frontend (Vercel) tetap bisa diakses *user*, namun request ke API akan gagal/timeout.
+- Begitu komputer kantor menyala kembali, Windows Service Cloudflare Tunnel akan otomatis *reconnect*, dan aplikasi langsung berfungsi normal kembali tanpa sentuhan apa-apa.
+- Tidak ada *Port Forwarding* di router, dan tidak ada orang luar yang bisa mengakses server database Anda. Semuanya melewati *tunnel* yang aman.
+
+---
+
+## TAHAP 4: Troubleshooting (Penyelesaian Masalah Umum)
+
+1. **Frontend (Vercel) menampilkan pesan "Network Error" atau gagal memuat data:**
+   - **Cek Komputer Kantor:** Pastikan komputer hidup dan terhubung ke internet.
+   - **Cek Backend Lokal:** Pastikan program backend (Node.js/NestJS) sudah dijalankan. (Tunnel hanya menyambungkan jaringan, Anda tetap harus merunning backend-nya).
+   - **Cek Dashboard Cloudflare:** Periksa di menu *Networks > Tunnels*, pastikan statusnya **Connected** (hijau), bukan **Down** (merah).
+   - **Cek CORS:** Buka aplikasi Anda di browser, klik kanan -> *Inspect* -> masuk ke *Console* atau *Network*. Jika ada peringatan berwarna merah tentang *CORS policy*, pastikan URL Vercel sudah ditambahkan ke daftar `origin` di file backend Anda (lihat Tahap 1 Langkah 4).
+
+2. **Status Tunnel Cloudflare menjadi "Down":**
+   - Buka aplikasi **Services** di komputer Windows lokal (`services.msc`).
+   - Cari *service* bernama `Cloudflared agent` atau sejenisnya.
+   - Klik kanan, lalu pilih **Restart** atau **Start**.
+   - Cek kembali koneksi internet komputer tersebut.
