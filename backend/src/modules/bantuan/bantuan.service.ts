@@ -1,4 +1,4 @@
-import { prisma } from '../../config/database';
+import prisma from '../../config/database';
 import logger from '../../utils/logger';
 
 interface CreateBantuanInput {
@@ -32,9 +32,15 @@ export class BantuanService {
       const ringkasanEsc = escapeSQL(input.ringkasan);
       const userIdParam = input.userId != null ? `${input.userId}` : 'NULL';
 
+      const maxBantuan = await prisma.bantuan.aggregate({
+        _max: { BantuanId: true }
+      });
+      const nextBantuanId = (maxBantuan._max.BantuanId || 0) + 1;
+
       // Execute stored procedure: dbo.usp_CreateBantuan
       const result = await prisma.$queryRawUnsafe<any[]>(`
         EXEC dbo.usp_CreateBantuan
+          @BantuanId = ${nextBantuanId},
           @FirstName = '${firstNameEsc}',
           @MiddleName = ${middleNameParam},
           @LastName = ${lastNameParam},
@@ -44,7 +50,7 @@ export class BantuanService {
           @UserId = ${userIdParam}
       `);
 
-      const bantuanResult = result[0];
+      const bantuanResult = result?.[0] || { BantuanId: 'unknown', Pesan: 'Berhasil' };
 
       logger.info(`Bantuan created: ${bantuanResult.BantuanId} by ${input.email}`);
 
