@@ -21,7 +21,7 @@ Berikut adalah panduan teknis langkah demi langkahnya:
    PORT=3001
    DATABASE_URL="sqlserver://localhost:1433;database=AgriflowDB;integratedSecurity=true;trustServerCertificate=true;"
    ```
-3. **Jalankan Backend:** Jalankan backend Node.js/Express Anda (misalnya dengan `npm run start` atau `npm run dev`). Pastikan aplikasi menyala tanpa *error* di `http://localhost:3001`.
+3. **Jalankan Backend:** Jalankan backend Node.js/Express Anda (misalnya dengan `npm run start` atau `npm run dev`). Pastikan aplikasi menyala tanpa *error* di `http://localhost:3002`.
 4. **PENTING (Update CORS):** Ubah konfigurasi CORS (di `main.ts` atau `app.ts`) agar backend mau menerima *request* dari Vercel. Jika tidak, browser akan memblokirnya:
    ```typescript
    app.use(cors({
@@ -50,7 +50,7 @@ Langkah ini akan membuatkan URL publik (HTTPS) yang terhubung langsung ke `local
 6. Klik **Next**. Di halaman *Route Traffic*:
    * **Public Hostname**: Isi dengan domain/subdomain Anda (misal `api.agriflow.id` atau biarkan Cloudflare memberikan domain default).
    * **Service Type**: Pilih `HTTP`.
-   * **URL**: Isi dengan `localhost:3001` (Port backend Express Anda).
+   * **URL**: Isi dengan `localhost:3002` (Port backend Express Anda).
 7. Klik **Save tunnel**.
 
 Sekarang, coba buka URL Publik dari Cloudflare Tunnel tersebut di HP/browser lain. Voila! API lokal Anda sudah bisa diakses secara global dengan HTTPS yang aman.

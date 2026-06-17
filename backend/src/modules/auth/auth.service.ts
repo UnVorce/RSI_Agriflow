@@ -85,14 +85,29 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
+    const lockoutKey = `login_attempts:${email}`;
+    const attempts = await redisClient.get(lockoutKey);
+
+    if (attempts && parseInt(attempts, 10) >= 5) {
+      throw new AppError('Akun dikunci sementara karena terlalu banyak percobaan gagal. Silakan coba lagi dalam 15 menit.', 403);
+    }
+
     const result = await prisma.$queryRawUnsafe<any[]>(`
       EXEC dbo.usp_LoginUser @Email = '${email.replace(/'/g, "''")}'
     `);
 
     const user = result[0];
 
-    if (!user) {
+    const handleFailedLogin = async () => {
+      const currentAttempts = await redisClient.incr(lockoutKey);
+      if (currentAttempts === 1 || currentAttempts >= 5) {
+        await redisClient.expire(lockoutKey, 900); // 15 minutes
+      }
       throw new AppError('Email atau password salah', 401);
+    };
+
+    if (!user) {
+      await handleFailedLogin();
     }
 
     if (user.Status === 'Rejected') {
@@ -105,8 +120,11 @@ export class AuthService {
 
     const isPasswordValid = await comparePassword(password, user.HashedPassword);
     if (!isPasswordValid) {
-      throw new AppError('Email atau password salah', 401);
+      await handleFailedLogin();
     }
+
+    // Reset attempts on successful login
+    await redisClient.del(lockoutKey);
 
     const userId = Number(user.UserId);
 

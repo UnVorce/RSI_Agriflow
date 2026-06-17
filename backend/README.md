@@ -37,8 +37,8 @@ npm run prisma:generate
 npm run dev
 ```
 
-API: http://localhost:3000  
-Docs: http://localhost:3000/api-docs
+API: http://localhost:3002
+Docs: http://localhost:3002/api-docs
 
 ## Scripts
 
