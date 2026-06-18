@@ -1,29 +1,2 @@
 # RSI_Agriflow_Backend
 
-## BAB 3 – LANGKAH DEPLOYMENT (STEP BY STEP)
-
-Laksanakan langkah-langkah berikut secara berurutan. JANGAN melanjutkan ke langkah berikutnya apabila indikator keberhasilan langkah sebelumnya belum terpenuhi. Waktu deployment yang disarankan: dini hari pukul 01.00–04.00 WIB saat trafik pengguna paling rendah.
-
-Konvensi placeholder:
-- `[domain.com]` = domain production utama (contoh: agriflow.com)
-- `[db-server-IP]` = IP internal database server (SQL Server)
-- `[nama_db_prod]` = nama database (`AgriFlowDB`)
-- `[app_user]` = user SQL Server production
-
-*Catatan: Sistem ini terdiri dari Frontend (Next.js) pada port 3000 dan Backend (Express + Prisma) pada port 3002 dengan database SQL Server.*
-
-| No. | Langkah | Tujuan & Deskripsi | Perintah / Aksi Utama | Indikator Keberhasilan |
-|:---|:---|:---|:---|:---|
-| 1 | Pre-Deployment Checklist & Go/No-Go | Memastikan semua prasyarat terpenuhi, server SQL Server sudah siap, dan ada persetujuan formal sebelum deployment. | 1. Centang seluruh tabel kesiapan infrastruktur.<br>2. Backup DB SQL Server (jika update aplikasi lama).<br>3. Dapatkan persetujuan Go dari PM & Dosen. | Semua checklist centang Ready. Database SQL Server dapat diakses. Persetujuan Go tercatat. |
-| 2 | Persiapan & Update Web Server | Memastikan OS ter-update dan semua software dependensi terinstal di Web Server production. | `sudo apt update && sudo apt upgrade -y`<br>`sudo apt install -y nginx nodejs npm git certbot python3-certbot-nginx redis ufw`<br>`sudo npm install -g pm2`<br>**Verifikasi:** `nginx -v && node -v && pm2 -v && redis-cli ping` | Semua perintah selesai tanpa error. Output versi sesuai. `redis-cli ping` mengembalikan `PONG`. |
-| 3 | Konfigurasi Firewall Web Server | Membuka hanya port HTTP/HTTPS dan SSH, memblokir port internal Node.js dan Redis. | `sudo ufw allow OpenSSH`<br>`sudo ufw allow 'Nginx Full'`<br>`sudo ufw deny 3000` (Frontend Node)<br>`sudo ufw deny 3002` (Backend Node)<br>`sudo ufw deny 6379` (Redis)<br>`sudo ufw enable` | `ufw status`: Port 22, 80, 443 berstatus ALLOW. Port internal Node dan Redis DENY / diblokir dari luar. |
-| 4 | Persiapan Database Server (SQL Server) | Menyiapkan kredensial SQL Server untuk aplikasi AgriFlow. | **Di SQL Server Server/SSMS:**<br>`CREATE DATABASE AgriFlowDB;`<br>`CREATE LOGIN [app_user] WITH PASSWORD = '[Password_Kuat]';`<br>`USE AgriFlowDB; CREATE USER [app_user] FOR LOGIN [app_user];`<br>`ALTER ROLE db_owner ADD MEMBER [app_user];` | Database `AgriFlowDB` dan user berhasil dibuat. Dapat diakses dari Web Server via kredensial. |
-| 5 | COPY: Transfer Source Code ke Target | Menyalin repo *monorepo* (Frontend & Backend) ke direktori web server. | `sudo mkdir -p /var/www/agriflow`<br>`cd /var/www && sudo git clone [URL_REPO] agriflow`<br>`cd agriflow && sudo git checkout [branch/tag-production]` | Direktori `/var/www/agriflow/` berisi sub-folder `frontend` dan `backend`. |
-| 6 | Buat & Konfigurasi `.env` Production | Mengisi environment variable untuk backend dan frontend. | **Backend:** `cp backend/.env.example backend/.env`<br>Edit: `DATABASE_URL="sqlserver://[db-server-IP]:1433;database=AgriFlowDB;user=[app_user];password=[Pass];encrypt=true;trustServerCertificate=true;"`<br>`PORT=3002`, `NODE_ENV=production`<br>**Frontend:** `cp frontend/.env.example frontend/.env`<br>Edit: `NEXT_PUBLIC_API_URL=https://[domain.com]/api` (Atau API domain terpisah) | File `.env` backend dan frontend ada dan berisi kredensial yang tepat. |
-| 7 | Install & Build Backend | Menginstall dependensi dan build TypeScript backend. | `cd /var/www/agriflow/backend`<br>`sudo npm install`<br>`npx prisma generate`<br>`sudo npm run build` | Folder `backend/dist/` dan `backend/node_modules/` berhasil terbuat tanpa error. |
-| 8 | Install & Build Frontend | Menginstall dependensi dan mem-build aplikasi Next.js frontend. | `cd /var/www/agriflow/frontend`<br>`sudo npm install`<br>`sudo npm run build` | Folder `frontend/.next/` berhasil digenerate tanpa error build. |
-| 9 | COPY: Migrasi & Seed Database (Prisma) | Menggunakan Prisma Migrate untuk mensinkronisasi schema database SQL Server dan mengisi data awal. | `cd /var/www/agriflow/backend`<br>`npx prisma migrate deploy`<br>*(Opsional untuk data awal)*: `npx prisma db seed` | Migrasi berjalan sukses. Tabel di SQL Server terbentuk. Data master siap. |
-| 10 | Jalankan Aplikasi dengan PM2 | Menjalankan Backend dan Frontend secara bersamaan menggunakan PM2. | **Backend:**<br>`cd /var/www/agriflow/backend`<br>`pm2 start dist/server.js --name 'agriflow-backend' --env production`<br>**Frontend:**<br>`cd /var/www/agriflow/frontend`<br>`pm2 start npm --name 'agriflow-frontend' -- run start`<br>**Simpan Service:**<br>`pm2 startup systemd && pm2 save` | `pm2 status` menunjukkan 2 service `online`. `curl -s http://127.0.0.1:3002/health` sehat. Frontend membalas di port `3000`. |
-| 11 | Konfigurasi Nginx (Reverse Proxy) | Mengatur Nginx agar merouting traffic ke Frontend dan Backend sesuai path atau subdomain. | `sudo nano /etc/nginx/sites-available/agriflow`<br>Isi blok server untuk proxy `/` ke port `3000` dan `/api` ke port `3002`.<br>`sudo ln -s /etc/nginx/sites-available/agriflow /etc/nginx/sites-enabled/`<br>`sudo nginx -t && sudo systemctl reload nginx` | Nginx `-t` syntax OK. Website frontend dan API bisa diakses. |
-| 12 | Instalasi SSL/HTTPS (Certbot) | Menginstall sertifikat keamanan Let's Encrypt. | `sudo certbot --nginx -d [domain.com] -d www.[domain.com]`<br>`sudo certbot renew --dry-run` | Gembok SSL tampil di browser untuk domain agriflow. Akses dialihkan ke HTTPS. |
-| 13 | Post-Deployment Monitoring | Memantau log PM2 dan stabilitas resource (CPU/RAM). | `pm2 logs --lines 100`<br>`htop`<br>`df -h`<br>`tail -f /var/log/nginx/error.log` | Tidak ada error berkelanjutan (looping crash) di PM2/Nginx. Resource server stabil. |
