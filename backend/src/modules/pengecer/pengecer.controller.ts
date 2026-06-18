@@ -1,6 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
 import { PengecerService } from './pengecer.service';
 
+const parseInputDate = (dateStr: any): Date | undefined => {
+  if (!dateStr) return undefined;
+  if (typeof dateStr === 'string' && dateStr.includes('/')) {
+    const datePart = dateStr.split(' | ')[0];
+    const parts = datePart.split('/');
+    if (parts.length === 3) {
+      return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    }
+  }
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? undefined : d;
+};
+
+const isFutureDate = (d: Date | undefined): boolean => {
+  if (!d || isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const check = new Date(d);
+  check.setHours(0, 0, 0, 0);
+  return check > today;
+};
+
 const service = new PengecerService();
 
 export class PengecerController {
@@ -79,11 +101,16 @@ export class PengecerController {
       const numKirimanId = Number(kirimanId);
       if (isNaN(numKirimanId)) return res.status(400).json({ success: false, message: 'kirimanId tidak valid' });
 
+      const parsedTimestamp = parseInputDate(timestampDiterima);
+      if (isFutureDate(parsedTimestamp)) {
+        return res.status(400).json({ success: false, message: 'Tanggal tidak boleh lebih dari tanggal sekarang' });
+      }
+
       const data = await service.receiveShipment({
         pengecerId: userId,
         kirimanId: numKirimanId,
         jumlahDiterima,
-        timestampDiterima: timestampDiterima ? new Date(timestampDiterima) : undefined,
+        timestampDiterima: parsedTimestamp,
       });
 
       res.status(201).json({ success: true, data });
@@ -123,11 +150,16 @@ export class PengecerController {
       const numPupukId = Number(pupukId);
       if (isNaN(numPupukId)) return res.status(400).json({ success: false, message: 'pupukId tidak valid' });
 
+      const parsedWaktu = parseInputDate(waktu);
+      if (isFutureDate(parsedWaktu)) {
+        return res.status(400).json({ success: false, message: 'Tanggal tidak boleh lebih dari tanggal sekarang' });
+      }
+
       const data = await service.addStock({
         userId,
         pupukId: numPupukId,
         jumlahMasuk,
-        waktu: waktu ? new Date(waktu) : undefined,
+        waktu: parsedWaktu,
       });
 
       res.json({ success: true, data });
