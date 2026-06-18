@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../common/middleware/auth.middleware';
 import { ShipmentService } from './shipment.service';
+import { parseInputDate, isFutureDate } from '../../utils/date.util';
 
 const shipmentService = new ShipmentService();
 
@@ -72,12 +73,19 @@ export class ShipmentController {
         res.status(400).json({ message: 'Kiriman ID tidak valid' });
         return;
       }
-      const { jumlahDiterima } = req.body;
+      const { jumlahDiterima, timestampDiterima } = req.body;
+
+      const parsedTimestamp = parseInputDate(timestampDiterima);
+      if (isFutureDate(parsedTimestamp)) {
+        res.status(400).json({ message: 'Tanggal tidak boleh lebih dari tanggal sekarang' });
+        return;
+      }
 
       const shipment = await shipmentService.receiveShipment(
         kirimanId,
         retailerId,
-        jumlahDiterima
+        jumlahDiterima,
+        parsedTimestamp
       );
 
       res.json({

@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
+import { isBeforeDate } from '../../utils/date.util';
 
 function esc(val: string | null | undefined): string {
   if (val == null) return 'NULL';
@@ -149,7 +150,7 @@ export class PengecerService {
     const result = await prisma.$transaction(async (tx: any) => {
       // 1. Get shipment data with pupuk info
       const [shipment] = await tx.$queryRaw<any[]>`
-        SELECT k.KirimanId, k.PupukId, k.UserIdDistributor, k.JumlahDikirim, p.JenisPupuk
+        SELECT k.KirimanId, k.PupukId, k.UserIdDistributor, k.JumlahDikirim, k.TimestampDikirim, p.JenisPupuk
         FROM trans.KIRIMAN_PUPUK k
         JOIN master.PUPUK p ON k.PupukId = p.PupukId
         WHERE k.KirimanId = ${data.kirimanId} AND k.UserIdPengecer = ${data.pengecerId}
@@ -157,6 +158,11 @@ export class PengecerService {
 
       if (!shipment) {
         throw new AppError('Pengiriman tidak ditemukan', 400);
+      }
+
+      const finalTimestampDiterima = data.timestampDiterima || new Date();
+      if (shipment.TimestampDikirim && isBeforeDate(finalTimestampDiterima, shipment.TimestampDikirim)) {
+        throw new AppError('Tanggal diterima tidak boleh lebih awal dari tanggal pengiriman', 400);
       }
 
       // 2. Determine status
@@ -372,9 +378,13 @@ export class PengecerService {
           k.JumlahDiterima AS jumlahDiterima,
           k.TimestampDikirim AS timestampDikirim,
           k.TimestampDiterima AS timestampDiterima,
-          k.Status AS status
+          k.Status AS status,
+          u.FirstName AS distributorNamaDepan,
+          u.MiddleName AS distributorNamaTengah,
+          u.LastName AS distributorNamaBelakang
         FROM trans.KIRIMAN_PUPUK k
         JOIN master.PUPUK p ON k.PupukId = p.PupukId
+        JOIN [master].[USER] u ON k.UserIdDistributor = u.UserId
         WHERE k.UserIdPengecer = ${userId}
         ORDER BY k.TimestampDikirim DESC
       `,
@@ -394,6 +404,7 @@ export class PengecerService {
         timestampDikirim: r.timestampDikirim || null,
         timestampDiterima: r.timestampDiterima || null,
         status: r.status || '',
+        distributor: [r.distributorNamaDepan, r.distributorNamaTengah, r.distributorNamaBelakang].filter(Boolean).join(' ') || '',
       })),
     };
   }

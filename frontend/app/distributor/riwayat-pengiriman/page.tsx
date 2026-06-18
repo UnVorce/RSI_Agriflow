@@ -246,9 +246,9 @@ export default function RiwayatPengirimanPage() {
 
           {/* Table */}
           <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #eee', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '14px 24px', borderBottom: '1px solid #f0f0f0' }}>
-              {['ID Pengiriman', 'Jenis Pupuk', 'Jumlah Pupuk', 'Tanggal Pengiriman', 'Status'].map(h => (
-                <span key={h} style={{ fontSize: '14px', color: '#888', fontWeight: 500, textAlign: 'center' }}>{h}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1.2fr 1.2fr 120px 120px 140px 140px 130px', padding: '14px 24px', borderBottom: '1px solid #f0f0f0' }}>
+              {['ID Kiriman', 'Pengecer', 'Jenis Pupuk', 'Dikirim', 'Diterima', 'Tgl Kirim', 'Tgl Terima', 'Status'].map(h => (
+                <span key={h} style={{ fontSize: '13px', color: '#888', fontWeight: 600, textAlign: 'center' }}>{h}</span>
               ))}
             </div>
 
@@ -264,15 +264,20 @@ export default function RiwayatPengirimanPage() {
                   : row.status === 'Dikirim' ? '#E6A817'
                   : '#BA1A1A'
                 return (
-                  <div key={row.kirimanId || i} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
+                  <div key={row.kirimanId || i} style={{ display: 'grid', gridTemplateColumns: '120px 1.2fr 1.2fr 120px 120px 140px 140px 130px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
                     <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{row.kirimanId?.slice(0, 8) || '-'}</span>
-                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{row.jenisPupuk}</span>
-                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{formatStock(row.jumlahDikirim)}</span>
-                    <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>
+                    <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{row.pengecer?.nama || '-'}</span>
+                    <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{row.jenisPupuk}</span>
+                    <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{formatStock(row.jumlahDikirim)}</span>
+                    <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{row.jumlahDiterima != null ? formatStock(row.jumlahDiterima) : '-'}</span>
+                    <span style={{ fontSize: '13px', color: '#555', textAlign: 'center' }}>
                       {row.timestampDikirim ? new Date(row.timestampDikirim).toLocaleDateString('id-ID') : '-'}
                     </span>
+                    <span style={{ fontSize: '13px', color: '#555', textAlign: 'center' }}>
+                      {row.timestampDiterima ? new Date(row.timestampDiterima).toLocaleDateString('id-ID') : '-'}
+                    </span>
                     <div style={{ textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', padding: '5px 0', borderRadius: '999px', background: bgColor, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', width: '120px', textAlign: 'center' }}>
+                      <span style={{ display: 'inline-block', padding: '5px 0', borderRadius: '999px', background: bgColor, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '12px', width: '100px', textAlign: 'center' }}>
                         {row.status}
                       </span>
                     </div>

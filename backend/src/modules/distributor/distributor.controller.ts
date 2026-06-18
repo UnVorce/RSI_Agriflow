@@ -1,27 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { DistributorService } from './distributor.service';
-
-const parseInputDate = (dateStr: any): Date | undefined => {
-  if (!dateStr) return undefined;
-  if (typeof dateStr === 'string' && dateStr.includes('/')) {
-    const datePart = dateStr.split(' | ')[0];
-    const parts = datePart.split('/');
-    if (parts.length === 3) {
-      return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-    }
-  }
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? undefined : d;
-};
-
-const isFutureDate = (d: Date | undefined): boolean => {
-  if (!d || isNaN(d.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const check = new Date(d);
-  check.setHours(0, 0, 0, 0);
-  return check > today;
-};
+import { parseInputDate, isFutureDate } from '../../utils/date.util';
 
 const service = new DistributorService();
 
