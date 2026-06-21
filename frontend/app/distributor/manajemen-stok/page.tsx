@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Sidebar from '@/components/distributor/SideBar'
 import TopBar from '@/components/layout/TopBar'
-import { Search, ArrowUpDown, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Search, ArrowUpDown, Plus, X } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 import { api } from '@/lib/api'
 import { formatStock } from '@/lib/format'
 
@@ -374,16 +375,8 @@ export default function ManajemenStokDistributorPage() {
           </div>
 
           {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px', marginTop: '20px' }}>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: currentPage === 1 ? 0.5 : 1 }}>
-              <ChevronLeft size={14} />
-            </button>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#333' }}>{currentPage}/{totalPages}</span>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: currentPage === totalPages ? 0.5 : 1 }}>
-              <ChevronRight size={14} />
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
 
           {/* ========== MODAL TAMBAH STOK ========== */}

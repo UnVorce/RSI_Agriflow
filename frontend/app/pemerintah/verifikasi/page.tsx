@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import SidebarPemerintah from '@/components/pemerintah/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import { api, ApiError } from '@/lib/api'
-import { CheckCircle, XCircle, ChevronLeft, ChevronRight, ExternalLink, Users, UserCheck, UserX } from 'lucide-react'
+import { CheckCircle, XCircle, ExternalLink, Users, UserCheck, UserX } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface PendingUser {
@@ -333,17 +334,7 @@ export default function VerifikasiPage() {
                   <p style={{ fontSize: '13px', color: '#888' }}>
                     Menampilkan {users.length} dari {totalRows} data
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                      style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: page === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: page === 1 ? 0.5 : 1 }}>
-                      <ChevronLeft size={14} />
-                    </button>
-                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#333' }}>{page}/{totalPages}</span>
-                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                      style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: page === totalPages ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: page === totalPages ? 0.5 : 1 }}>
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
+                  <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
                 </div>
               </>
             )}
