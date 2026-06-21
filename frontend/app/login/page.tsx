@@ -117,9 +117,10 @@ export default function LoginPage() {
               />
               <input
                 type="email"
-                placeholder="aanindya05@gmail.com"
+                placeholder="example@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 style={inputStyle}
               />
             </div>
@@ -136,9 +137,10 @@ export default function LoginPage() {
               />
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
+                placeholder="Masukkan password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 style={{ ...inputStyle, paddingRight: '44px' }}
               />
               <button

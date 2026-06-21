@@ -85,6 +85,20 @@ export class DistributorController {
   }
 
   /**
+   * GET /api/distributor/pengecer/search
+   * Search pengecer by name
+   */
+  async searchPengecer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const q = (req.query.q as string || '').trim();
+      const data = await service.searchPengecer(q);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/distributor/validate-pengecer/:pengecerId
    * Validate pengecer before shipment
    */

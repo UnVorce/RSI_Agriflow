@@ -78,7 +78,7 @@ export default function ManajemenStokPage() {
     )
   }
 
-  const pageSize = 10
+  const pageSize = 6
   const totalPages = Math.ceil(filtered.length / pageSize)
   const displayed = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
@@ -292,18 +292,13 @@ export default function ManajemenStokPage() {
 
           {/* Pagination */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px', marginTop: '20px' }}>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: currentPage === 1 ? 0.5 : 1 }}>
               <ChevronLeft size={14} />
             </button>
-            {Array.from({length: totalPages}, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setCurrentPage(p)}
-                style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid', borderColor: currentPage === p ? '#1e6b1e' : '#ddd', background: currentPage === p ? '#1e6b1e' : 'white', color: currentPage === p ? 'white' : '#333', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
-                {p}
-              </button>
-            ))}
-            <button onClick={() => setCurrentPage(p => p + 1)}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#333' }}>{currentPage}/{totalPages}</span>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: currentPage === totalPages ? 0.5 : 1 }}>
               <ChevronRight size={14} />
             </button>
           </div>

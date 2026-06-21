@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
 import redisClient from '../../config/redis';
+import bcrypt from 'bcrypt';
 
 function esc(val: string | null | undefined): string {
   if (val == null) return 'NULL';
@@ -152,6 +153,44 @@ export class PemerintahService {
   }
 
   /**
+   * GET /api/pemerintah/users/list
+   * Get users by status (Active / Rejected) with pagination
+   */
+  async getUsersByStatus(status: string, pageNumber: number = 1, pageSize: number = 10) {
+    const skip = (pageNumber - 1) * pageSize;
+
+    const [users, totalCount] = await Promise.all([
+      prisma.user.findMany({
+        where: { Status: status },
+        select: {
+          UserId: true,
+          FirstName: true,
+          MiddleName: true,
+          LastName: true,
+          Email: true,
+          CreatedAt: true,
+          Role: { select: { RoleName: true } },
+        },
+        orderBy: { CreatedAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      prisma.user.count({ where: { Status: status } }),
+    ]);
+
+    const mapped = users.map((u, idx) => ({
+      no: skip + idx + 1,
+      userId: u.UserId,
+      namaLengkap: [u.FirstName, u.MiddleName, u.LastName].filter(Boolean).join(' '),
+      email: u.Email,
+      role: u.Role.RoleName,
+      createdAt: u.CreatedAt,
+    }));
+
+    return { users: mapped, totalRows: totalCount };
+  }
+
+  /**
    * Get pending users for verification with pagination
    */
   async getPendingUsers(pageNumber: number = 1, pageSize: number = 10) {
@@ -297,6 +336,78 @@ export class PemerintahService {
     `);
 
     return { message: 'User berhasil ditolak' };
+  }
+
+  /**
+   * PATCH /api/pemerintah/users/:userId/edit
+   * Update user name, email, role
+   */
+  async editUser(userId: number, data: { namaLengkap?: string; email?: string; roleName?: string }) {
+    const user = await prisma.user.findUnique({ where: { UserId: userId } });
+    if (!user) throw new AppError('Pengguna tidak ditemukan', 404);
+
+    const updateData: any = {};
+
+    if (data.namaLengkap !== undefined) {
+      const parts = data.namaLengkap.split(' ').filter(Boolean);
+      updateData.FirstName = parts[0] || '';
+      updateData.MiddleName = parts.length > 2 ? parts.slice(1, -1).join(' ') : null;
+      updateData.LastName = parts.length > 1 ? parts[parts.length - 1] : null;
+    }
+
+    if (data.email !== undefined) {
+      const existing = await prisma.user.findUnique({ where: { Email: data.email } });
+      if (existing && existing.UserId !== userId) throw new AppError('Email sudah digunakan', 400);
+      updateData.Email = data.email;
+    }
+
+    if (data.roleName !== undefined) {
+      const role = await prisma.role.findUnique({ where: { RoleName: data.roleName } });
+      if (!role) throw new AppError('Role tidak ditemukan', 400);
+      updateData.RoleId = role.RoleId;
+    }
+
+    await prisma.user.update({ where: { UserId: userId }, data: updateData });
+
+    return { message: 'User berhasil diperbarui' };
+  }
+
+  /**
+   * POST /api/pemerintah/users/:userId/reset-password
+   * Generate random password, hash, save, return plaintext
+   */
+  async resetPassword(userId: number) {
+    const user = await prisma.user.findUnique({ where: { UserId: userId } });
+    if (!user) throw new AppError('Pengguna tidak ditemukan', 404);
+
+    const plainPassword = `Agri${Math.random().toString(36).slice(2, 8)}`;
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+    await prisma.user.update({
+      where: { UserId: userId },
+      data: { HashedPassword: hashedPassword },
+    });
+
+    return { newPassword: plainPassword };
+  }
+
+  /**
+   * POST /api/pemerintah/users/:userId/toggle-status
+   * Toggle between Active and Rejected
+   */
+  async toggleUserStatus(userId: number) {
+    const user = await prisma.user.findUnique({ where: { UserId: userId } });
+    if (!user) throw new AppError('Pengguna tidak ditemukan', 404);
+    if (user.Status === 'Pending') throw new AppError('User pending tidak bisa dinonaktifkan', 400);
+
+    const newStatus = user.Status === 'Active' ? 'Rejected' : 'Active';
+
+    await prisma.user.update({
+      where: { UserId: userId },
+      data: { Status: newStatus },
+    });
+
+    return { newStatus };
   }
 
   /**

@@ -8,6 +8,22 @@ export class PetaniController {
     this.petaniService = new PetaniService();
   }
 
+  // GET /api/petani/search
+  searchFarmers = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = Number(req.user?.userId);
+      if (!userId || isNaN(userId)) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+      const q = (req.query.q as string || '').trim();
+      const data = await this.petaniService.searchFarmers(userId, q);
+      res.json({ success: true, data });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Gagal mencari petani' });
+    }
+  };
+
   // Get all farmers for logged-in retailer
   getMyFarmers = async (req: Request, res: Response): Promise<void> => {
     try {

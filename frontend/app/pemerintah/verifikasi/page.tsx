@@ -24,7 +24,7 @@ interface SummaryData {
   totalRows: number
 }
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 6
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function VerifikasiPage() {
@@ -334,40 +334,14 @@ export default function VerifikasiPage() {
                     Menampilkan {users.length} dari {totalRows} data
                   </p>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e5e5',
-                        background: page === 1 ? '#f5f5f5' : 'white',
-                        cursor: page === 1 ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        opacity: page === 1 ? 0.5 : 1,
-                      }}
-                    >
-                      <ChevronLeft size={16} />
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                      style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: page === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: page === 1 ? 0.5 : 1 }}>
+                      <ChevronLeft size={14} />
                     </button>
-                    <span style={{ fontSize: '14px', color: '#333', fontWeight: 600 }}>
-                      {page} / {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e5e5',
-                        background: page === totalPages ? '#f5f5f5' : 'white',
-                        cursor: page === totalPages ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        opacity: page === totalPages ? 0.5 : 1,
-                      }}
-                    >
-                      <ChevronRight size={16} />
+                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#333' }}>{page}/{totalPages}</span>
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                      style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: page === totalPages ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: page === totalPages ? 0.5 : 1 }}>
+                      <ChevronRight size={14} />
                     </button>
                   </div>
                 </div>

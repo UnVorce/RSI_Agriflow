@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Calendar } from 'lucide-react'
 import Sidebar from '@/components/distributor/SideBar'
@@ -15,11 +15,14 @@ type Step = 1 | 2 | 3
 export default function TambahPengirimanPage() {
   const [step, setStep]           = useState<Step>(1)
   
-  // Step 1: ID Pengecer
-  const [idInput, setIdInput]     = useState('')
-  const [idError, setIdError]     = useState('')
-  const [pengecer, setPengecer]   = useState<{ nama: string } | null>(null)
+  // Step 1: Cari Pengecer
+  const [namaInput, setNamaInput] = useState('')
+  const [showPengecerDropdown, setShowPengecerDropdown] = useState(false)
+  const [pengecerList, setPengecerList] = useState<{ userId: number; nama: string }[]>([])
+  const [pengecer, setPengecer]   = useState<{ userId: number; nama: string } | null>(null)
   const [idKonfirm, setIdKonfirm] = useState('')
+  const [idError, setIdError]     = useState('')
+  const pengecerRef = useRef<HTMLDivElement>(null)
 
   // Step 2 form
   const [jenis, setJenis]         = useState('')
@@ -34,9 +37,30 @@ export default function TambahPengirimanPage() {
   const [waktuKonfirmasi, setWaktuKonfirmasi] = useState('')
 
   const [availableStock, setAvailableStock] = useState<StockItem[]>([])
+  const [recentShipments, setRecentShipments] = useState<{ kirimanId: string; timestampDikirim: string; jenisPupuk: string; jumlahDikirim: number }[]>([])
+
+  const searchPengecer = useCallback(async (q: string) => {
+    try {
+      const res = await api.get<{ userId: number; nama: string }[]>(`/api/distributor/pengecer/search?q=${encodeURIComponent(q)}`)
+      if (res.data) setPengecerList(Array.isArray(res.data) ? res.data : [])
+    } catch { setPengecerList([]) }
+  }, [])
+
+  const pengecerTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  function handleNamaInput(v: string) {
+    setNamaInput(v)
+    setPengecer(null)
+    setIdKonfirm('')
+    setIdError('')
+    setShowPengecerDropdown(true)
+    if (pengecerTimer.current) clearTimeout(pengecerTimer.current)
+    pengecerTimer.current = setTimeout(() => searchPengecer(v), 300)
+  }
 
   useEffect(() => {
     function outside(e: MouseEvent) {
+      if (pengecerRef.current && !pengecerRef.current.contains(e.target as Node))
+        setShowPengecerDropdown(false)
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
         setShowDropdown(false)
     }
@@ -65,36 +89,19 @@ export default function TambahPengirimanPage() {
     s.name.toLowerCase().includes(jenisSearch.toLowerCase())
   )
 
-  const [cekLoading, setCekLoading] = useState(false)
   const [kirimLoading, setKirimLoading] = useState(false)
   const [kirimError, setKirimError] = useState('')
-  const [recentShipments, setRecentShipments] = useState<{ kirimanId: string; timestampDikirim: string; jenisPupuk: string; jumlahDikirim: number }[]>([])
 
-  async function handleCekId() {
-    const id = idInput.trim().toUpperCase()
-    if (!id) {
-      setIdError('Masukkan ID Pengecer')
-      return
-    }
-    setCekLoading(true)
+  function handlePilihPengecer(u: { userId: number; nama: string }) {
+    setPengecer(u)
+    setIdKonfirm(String(u.userId))
+    setNamaInput(u.nama)
+    setShowPengecerDropdown(false)
     setIdError('')
-    try {
-      const res = await api.get<{ IsValid: boolean; Message: string; nama?: string }>(`/api/distributor/validasi-pengecer/${id}`)
-      if (res.data?.IsValid) {
-        setPengecer({ nama: res.data.nama || id })
-        setIdKonfirm(id)
-        setJenis('')
-        setJumlah('')
-        setWaktu('')
-        setStep(2)
-      } else {
-        setIdError(res.data?.Message || 'ID Pengecer tidak valid')
-      }
-    } catch (err) {
-      setIdError(err instanceof ApiError ? err.message : 'Gagal memvalidasi ID Pengecer')
-    } finally {
-      setCekLoading(false)
-    }
+    setJenis('')
+    setJumlah('')
+    setWaktu('')
+    setStep(2)
   }
 
   async function handleKonfirmasi() {
@@ -127,7 +134,7 @@ export default function TambahPengirimanPage() {
   }
 
   const steps = [
-    { n: 1, label: 'ID Pengecer' },
+    { n: 1, label: 'Cari Pengecer' },
     { n: 2, label: 'Detail Pengiriman' },
     { n: 3, label: 'Simpan Pengiriman' },
   ]
@@ -202,11 +209,23 @@ export default function TambahPengirimanPage() {
               <div>
                 {step === 1 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '400px' }}>
-                    <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '17px', color: '#1a1a1a' }}>Masukkan ID Pengecer</p>
-                    <input type="text" value={idInput} onChange={e => { setIdInput(e.target.value); setIdError('') }} placeholder="Contoh: P-001" style={inputStyle} onKeyDown={e => e.key === 'Enter' && handleCekId()} />
+                    <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '17px', color: '#1a1a1a' }}>Masukkan Nama Pengecer</p>
+                    <div ref={pengecerRef} style={{ position: 'relative' }}>
+                      <input type="text" value={namaInput} onChange={e => handleNamaInput(e.target.value)} onFocus={() => { searchPengecer(namaInput); setShowPengecerDropdown(true) }} placeholder="Cari nama pengecer..." style={{ ...inputStyle, paddingRight: '40px' }} />
+                      <span onClick={() => setShowPengecerDropdown(v => !v)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#1e6b1e', userSelect: 'none' }}>▾</span>
+                      {showPengecerDropdown && pengecerList.length > 0 && (
+                        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: 'white', border: '1.5px solid #c8e0c8', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 50, maxHeight: '200px', overflowY: 'auto' }}>
+                          {pengecerList.map((u, i) => (
+                            <div key={u.userId} onMouseDown={() => handlePilihPengecer(u)} style={{ padding: '11px 16px', fontSize: '14px', color: '#1a1a1a', cursor: 'pointer', background: 'white', borderRadius: i === 0 ? '10px 10px 0 0' : i === pengecerList.length - 1 ? '0 0 10px 10px' : '0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background 0.1s' }}>
+                              <span>{u.nama}</span>
+                              <span style={{ fontSize: '12px', color: '#1e6b1e', fontWeight: 600 }}>ID: {u.userId}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     {idError && <p style={{ fontSize: '13px', color: '#c53030' }}>{idError}</p>}
                     {kirimError && <p style={{ fontSize: '13px', color: '#c53030' }}>{kirimError}</p>}
-                    <button style={{ ...btnPrimary, opacity: cekLoading ? 0.6 : 1 }} disabled={cekLoading} onClick={handleCekId}>{cekLoading ? 'Memeriksa...' : 'CEK ID'}</button>
                   </div>
                 )}
 
@@ -222,7 +241,7 @@ export default function TambahPengirimanPage() {
                             {filteredJenis.map((s, i) => (
                               <div key={s.name} onMouseDown={() => { setJenis(s.name); setJenisSearch(''); setShowDropdown(false) }} style={{ padding: '11px 16px', fontSize: '14px', color: '#1a1a1a', cursor: 'pointer', background: jenis === s.name ? '#f0f9f0' : 'white', borderRadius: i === 0 ? '10px 10px 0 0' : i === filteredJenis.length - 1 ? '0 0 10px 10px' : '0', fontWeight: jenis === s.name ? 600 : 400, transition: 'background 0.1s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span>{s.name}</span>
-                                <span style={{ fontSize: '12px', color: '#1e6b1e', fontWeight: 600 }}>{s.stok} Ton</span>
+                                <span style={{ fontSize: '12px', color: '#1e6b1e', fontWeight: 600 }}>{formatStock(s.stok)}</span>
                               </div>
                             ))}
                           </div>
@@ -230,7 +249,7 @@ export default function TambahPengirimanPage() {
                       </div>
                     </div>
                     <div>
-                      <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', marginBottom: '10px', color: '#1a1a1a' }}>Jumlah Pupuk (Ton)</p>
+                      <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', marginBottom: '10px', color: '#1a1a1a' }}>Jumlah Pupuk (Kg)</p>
                       <input type="number" value={jumlah} onChange={e => setJumlah(e.target.value)} placeholder="Masukkan jumlah pupuk" style={inputStyle} />
                     </div>
                     <div>

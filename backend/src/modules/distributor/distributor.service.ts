@@ -145,6 +145,45 @@ export class DistributorService {
   }
 
   /**
+   * GET /api/distributor/pengecer/search
+   * Search pengecer by name (partial match)
+   */
+  async searchPengecer(query: string) {
+    try {
+      const users = await prisma.user.findMany({
+        where: {
+          Role: { RoleName: 'PENGECER' },
+          ...(query
+            ? {
+                OR: [
+                  { FirstName: { contains: query } },
+                  { MiddleName: { contains: query } },
+                  { LastName: { contains: query } },
+                  ...(isNaN(Number(query)) ? [] : [{ UserId: Number(query) }]),
+                ],
+              }
+            : {}),
+        },
+        select: {
+          UserId: true,
+          FirstName: true,
+          MiddleName: true,
+          LastName: true,
+        },
+        take: 20,
+      });
+
+      return users.map(u => ({
+        userId: u.UserId,
+        nama: [u.FirstName, u.MiddleName, u.LastName].filter(Boolean).join(' '),
+      }));
+    } catch (error: any) {
+      logger.error('Failed to search pengecer', { query, error: error.message });
+      throw new AppError('Gagal mencari pengecer', 500);
+    }
+  }
+
+  /**
    * Validate pengecer (retailer) before creating shipment
    * SP: dbo.usp_ValidatePengecer
    */
