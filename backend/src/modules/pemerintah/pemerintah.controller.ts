@@ -171,6 +171,34 @@ export class PemerintahController {
   }
 
   /**
+   * GET /api/pemerintah/stock-time-series
+   * Get stock time series for dashboard chart
+   */
+  async getStockTimeSeries(req: Request, res: Response, next: NextFunction) {
+    try {
+      const weeks = parseInt(req.query.weeks as string) || 52;
+      const data = await service.getStockTimeSeries(weeks);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/pemerintah/users/nonaktifkan-candidates
+   * Get users sorted by nonaktifkan criteria
+   */
+  async getNonaktifkanCandidates(req: Request, res: Response, next: NextFunction) {
+    try {
+      const role = (req.query.role as string) || 'DISTRIBUTOR';
+      const data = await service.getNonaktifkanCandidates(role);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/pemerintah/help-requests
    * Get help requests (bantuan)
    */

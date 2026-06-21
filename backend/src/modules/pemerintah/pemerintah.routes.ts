@@ -24,6 +24,12 @@ router.patch('/users/:userId/edit', controller.editUser.bind(controller));
 router.post('/users/:userId/reset-password', controller.resetPassword.bind(controller));
 router.post('/users/:userId/toggle-status', controller.toggleUserStatus.bind(controller));
 
+// Stock Time Series
+router.get('/stock-time-series', controller.getStockTimeSeries.bind(controller));
+
+// Nonaktifkan Candidates
+router.get('/users/nonaktifkan-candidates', controller.getNonaktifkanCandidates.bind(controller));
+
 // Help Requests
 router.get('/help-requests', controller.getHelpRequests.bind(controller));
 

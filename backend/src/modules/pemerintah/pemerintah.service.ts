@@ -411,6 +411,191 @@ export class PemerintahService {
   }
 
   /**
+   * Get stock time series for dashboard chart
+   * Returns weekly cumulative data for: distributor stock, pengecer stock, redeemed (petani)
+   */
+  async getStockTimeSeries(weeks: number = 52) {
+    // 1900-01-01 was a Monday; used to compute week-start Monday dates
+    const weekStartRef = '1900-01-01';
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - weeks * 7);
+    const startStr = startDate.toISOString().split('T')[0];
+
+    // Function to get Monday of the week for a given date column
+    const weekStartExpr = (col: string) =>
+      `DATEADD(DAY, (DATEDIFF(DAY, '${weekStartRef}', ${col}) / 7) * 7, '${weekStartRef}')`;
+
+    // 1. Weekly shipments from distributors
+    const shipmentsRaw = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        ${weekStartExpr('TimestampDikirim')} AS tanggalMulai,
+        SUM(JumlahDikirim) AS total
+      FROM trans.KIRIMAN_PUPUK
+      WHERE TimestampDikirim >= ${esc(startStr)}
+      GROUP BY ${weekStartExpr('TimestampDikirim')}
+      ORDER BY tanggalMulai
+    `);
+
+    // 2. Weekly received by pengecer
+    const receivedRaw = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        ${weekStartExpr('TimestampDiterima')} AS tanggalMulai,
+        SUM(JumlahDiterima) AS total
+      FROM trans.KIRIMAN_PUPUK
+      WHERE TimestampDiterima IS NOT NULL
+        AND TimestampDiterima >= ${esc(startStr)}
+      GROUP BY ${weekStartExpr('TimestampDiterima')}
+      ORDER BY tanggalMulai
+    `);
+
+    // 3. Weekly redemptions
+    const redeemedRaw = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        ${weekStartExpr('TimestampPenebusan')} AS tanggalMulai,
+        SUM(Jumlah) AS total
+      FROM trans.PENEBUSAN_PUPUK
+      WHERE Status = ${esc('Selesai')}
+        AND TimestampPenebusan >= ${esc(startStr)}
+      GROUP BY ${weekStartExpr('TimestampPenebusan')}
+      ORDER BY tanggalMulai
+    `);
+
+    // Build week range (last N weeks, Monday of each week)
+    const weekRange: string[] = [];
+    const toWeekKey = (d: Date): string => {
+      const monday = new Date(d);
+      const day = monday.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      monday.setDate(monday.getDate() + diff);
+      return monday.toISOString().split('T')[0];
+    };
+
+    const today = new Date();
+    const currentMonday = new Date(toWeekKey(today));
+    for (let i = weeks - 1; i >= 0; i--) {
+      const d = new Date(currentMonday);
+      d.setDate(d.getDate() - i * 7);
+      weekRange.push(d.toISOString().split('T')[0]);
+    }
+
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+    const toMap = (arr: any[]) => {
+      const m = new Map<string, number>();
+      arr.forEach((r: any) => {
+        const d = r.tanggalMulai instanceof Date ? r.tanggalMulai : new Date(r.tanggalMulai);
+        m.set(formatDate(d), Number(r.total) || 0);
+      });
+      return m;
+    };
+
+    const shipmentsMap = toMap(shipmentsRaw);
+    const receivedMap = toMap(receivedRaw);
+    const redeemedMap = toMap(redeemedRaw);
+
+    let cumShipments = 0;
+    let cumReceived = 0;
+    let cumRedeemed = 0;
+
+    const series = weekRange.map((tanggalMulai) => {
+      cumShipments += shipmentsMap.get(tanggalMulai) || 0;
+      cumReceived += receivedMap.get(tanggalMulai) || 0;
+      cumRedeemed += redeemedMap.get(tanggalMulai) || 0;
+
+      const distributorStock = cumShipments - cumReceived;
+      const pengecerStock = cumReceived - cumRedeemed;
+
+      return {
+        tanggalMulai,
+        distributorKg: Math.max(0, distributorStock),
+        pengecerKg: Math.max(0, pengecerStock),
+        petaniKg: cumRedeemed,
+      };
+    });
+
+    return { series };
+  }
+
+  /**
+   * Get users sorted by nonaktifkan criteria for government user management
+   * Distributor: sorted by most mismatched shipments DESC
+   * Pengecer: sorted by ratio of stock / redemptions DESC (high stock, low redemption)
+   */
+  async getNonaktifkanCandidates(role: string) {
+    if (role === 'DISTRIBUTOR') {
+      const result = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT
+          u.UserId,
+          u.FirstName,
+          u.MiddleName,
+          u.LastName,
+          u.Email,
+          ISNULL(mismatch.total, 0) AS totalMismatch
+        FROM master.[USER] u
+        LEFT JOIN (
+          SELECT UserIdDistributor AS userId, COUNT(*) AS total
+          FROM trans.KIRIMAN_PUPUK
+          WHERE Status = ${esc('Tidak Sesuai')}
+          GROUP BY UserIdDistributor
+        ) mismatch ON u.UserId = mismatch.userId
+        WHERE u.RoleId = (SELECT RoleId FROM ref.ROLE WHERE RoleName = ${esc('DISTRIBUTOR')})
+          AND u.Status = 'Active'
+        ORDER BY totalMismatch DESC, u.FirstName ASC
+      `);
+      return result.map((r: any) => ({
+        userId: Number(r.UserId),
+        namaLengkap: [r.FirstName, r.MiddleName, r.LastName].filter(Boolean).join(' '),
+        email: r.Email,
+        totalMismatch: Number(r.totalMismatch),
+      }));
+    }
+
+    if (role === 'PENGECER') {
+      const result = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT
+          u.UserId,
+          u.FirstName,
+          u.MiddleName,
+          u.LastName,
+          u.Email,
+          ISNULL(stk.jumlah, 0) AS totalStock,
+          ISNULL(red.total, 0) AS totalRedemption
+        FROM master.[USER] u
+        LEFT JOIN (
+          SELECT UserId, SUM(Jumlah) AS jumlah
+          FROM trans.STOK
+          GROUP BY UserId
+        ) stk ON u.UserId = stk.UserId
+        LEFT JOIN (
+          SELECT UserIdPengecer AS userId, SUM(Jumlah) AS total
+          FROM trans.PENEBUSAN_PUPUK
+          WHERE Status = ${esc('Selesai')}
+          GROUP BY UserIdPengecer
+        ) red ON u.UserId = red.userId
+        WHERE u.RoleId = (SELECT RoleId FROM ref.ROLE WHERE RoleName = ${esc('PENGECER')})
+          AND u.Status = 'Active'
+        ORDER BY
+          CASE WHEN ISNULL(red.total, 0) = 0 THEN 999999 ELSE ISNULL(stk.jumlah, 0) / red.total END DESC,
+          ISNULL(stk.jumlah, 0) DESC,
+          u.FirstName ASC
+      `);
+      return result.map((r: any) => ({
+        userId: Number(r.UserId),
+        namaLengkap: [r.FirstName, r.MiddleName, r.LastName].filter(Boolean).join(' '),
+        email: r.Email,
+        totalStock: Number(r.totalStock),
+        totalRedemption: Number(r.totalRedemption),
+        ratio: Number(r.totalRedemption) > 0
+          ? Number((Number(r.totalStock) / Number(r.totalRedemption)).toFixed(2))
+          : Number(r.totalStock) > 0 ? 999.99 : 0,
+      }));
+    }
+
+    return [];
+  }
+
+  /**
    * Get help requests (bantuan)
    * SP: dbo.usp_GetPemerintahBantuan
    */
