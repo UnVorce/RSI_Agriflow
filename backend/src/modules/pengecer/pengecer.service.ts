@@ -131,6 +131,48 @@ export class PengecerService {
   }
 
   /**
+   * GET /api/pengecer/kiriman/search
+   * Search incoming shipments by ID or distributor name
+   */
+  async searchKiriman(userId: number, query: string) {
+    try {
+      const result = await prisma.$queryRaw<any[]>`
+        SELECT
+          k.KirimanId,
+          k.JumlahDikirim,
+          k.TimestampDikirim,
+          k.Status,
+          p.JenisPupuk,
+          u.FirstName AS distFirstName,
+          u.MiddleName AS distMiddleName,
+          u.LastName AS distLastName
+        FROM trans.KIRIMAN_PUPUK k
+        JOIN master.PUPUK p ON k.PupukId = p.PupukId
+        JOIN [master].[USER] u ON k.UserIdDistributor = u.UserId
+        WHERE k.UserIdPengecer = ${userId}
+          AND (
+            CAST(k.KirimanId AS NVARCHAR(20)) LIKE ${`%${query}%`}
+            OR u.FirstName LIKE ${`%${query}%`}
+            OR u.MiddleName LIKE ${`%${query}%`}
+            OR u.LastName LIKE ${`%${query}%`}
+          )
+        ORDER BY k.TimestampDikirim DESC
+      `;
+
+      return (result || []).map(r => ({
+        kirimanId: String(r.KirimanId ?? ''),
+        jenisPupuk: r.JenisPupuk || '',
+        jumlahDikirim: Number(r.JumlahDikirim ?? 0),
+        timestampDikirim: r.TimestampDikirim || null,
+        status: r.Status || '',
+        distributor: [r.distFirstName, r.distMiddleName, r.distLastName].filter(Boolean).join(' '),
+      }));
+    } catch (error: any) {
+      throw new AppError('Gagal mencari pengiriman', 500);
+    }
+  }
+
+  /**
    * Receive shipment from distributor
    */
   async receiveShipment(data: {
@@ -158,6 +200,10 @@ export class PengecerService {
 
       if (!shipment) {
         throw new AppError('Pengiriman tidak ditemukan', 400);
+      }
+
+      if (shipment.Status && shipment.Status !== 'Dikirim') {
+        throw new AppError('Pengiriman sudah diterima sebelumnya', 400);
       }
 
       const finalTimestampDiterima = data.timestampDiterima || new Date();
@@ -240,23 +286,25 @@ export class PengecerService {
       const pesanDistributor = `Kiriman #${data.kirimanId} (${shipment.JenisPupuk}) ${statusNotif} oleh ${namaPengecer}. Dikirim: ${Number(shipment.JumlahDikirim).toFixed(2)} kg, Diterima: ${Number(data.jumlahDiterima).toFixed(2)} kg`;
       const truncatedDistributor = pesanDistributor.slice(0, maxLen);
 
-      // Insert notification for pengecer
-      const [notifIdPengecer] = await tx.$queryRaw<any[]>`
-        SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
-      `;
-      await tx.$executeRawUnsafe(`
-        INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
-        VALUES (${Number(notifIdPengecer.nextId)}, 'PENERIMAAN', 'Penerimaan Stok', ${esc(truncatedPengecer)}, 0, ${data.pengecerId}, GETDATE())
-      `);
+      // Insert notification for pengecer (only for mismatch)
+      if (status === 'Tidak Sesuai') {
+        const [notifIdPengecer] = await tx.$queryRaw<any[]>`
+          SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
+        `;
+        await tx.$executeRawUnsafe(`
+          INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+          VALUES (${Number(notifIdPengecer.nextId)}, 'KETIDAKSESUAIAN', 'Penerimaan Tidak Sesuai', ${esc(truncatedPengecer)}, 0, ${data.pengecerId}, GETDATE())
+        `);
 
-      // Insert notification for distributor
-      const [notifIdDistributor] = await tx.$queryRaw<any[]>`
-        SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
-      `;
-      await tx.$executeRawUnsafe(`
-        INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
-        VALUES (${Number(notifIdDistributor.nextId)}, 'PENERIMAAN', 'Penerimaan Stok', ${esc(truncatedDistributor)}, 0, ${shipment.UserIdDistributor}, GETDATE())
-      `);
+        // Insert notification for distributor
+        const [notifIdDistributor] = await tx.$queryRaw<any[]>`
+          SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
+        `;
+        await tx.$executeRawUnsafe(`
+          INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+          VALUES (${Number(notifIdDistributor.nextId)}, 'KETIDAKSESUAIAN', 'Penerimaan Tidak Sesuai', ${esc(truncatedDistributor)}, 0, ${shipment.UserIdDistributor}, GETDATE())
+        `);
+      }
 
       // 8. Insert LOG_AKTIVITAS
       await tx.$executeRawUnsafe(`

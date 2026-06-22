@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import Sidebar from '@/components/distributor/SideBar'
 import TopBar from '@/components/layout/TopBar'
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
+import { Search, SlidersHorizontal, Calendar, X } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 import { api } from '@/lib/api'
 import { formatStock } from '@/lib/format'
 
@@ -96,7 +97,7 @@ export default function RiwayatPengirimanPage() {
   const totalTidakSesuai = summary.totalMismatch
   const isFilterActive   = appliedStart || appliedEnd || appliedStatus !== 'Semua'
 
-  const pageSize = 10
+  const pageSize = 6
   const totalPages = Math.ceil(filtered.length / pageSize)
   const displayed = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
@@ -287,12 +288,8 @@ export default function RiwayatPengirimanPage() {
             )}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px', marginTop: '20px' }}>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={14} /></button>
-            {Array.from({length: totalPages}, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setCurrentPage(p)} style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid', borderColor: currentPage === p ? '#1e6b1e' : '#ddd', background: currentPage === p ? '#1e6b1e' : 'white', color: currentPage === p ? 'white' : '#333', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>{p}</button>
-            ))}
-            <button onClick={() => setCurrentPage(p => p + 1)} style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={14} /></button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
         </main>
       </div>

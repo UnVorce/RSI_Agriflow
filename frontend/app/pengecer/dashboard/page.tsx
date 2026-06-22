@@ -159,7 +159,7 @@ export default function DashboardPage() {
                       {(data?.recentReceipts ?? []).length === 0 ? (
                         <p style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '12px' }}>Belum ada penerimaan</p>
                       ) : (
-                        (data?.recentReceipts ?? []).map((item: any, i: number) => <ActivityRow key={i} {...toActivityRow(item, 'receipt')} />)
+                        (data?.recentReceipts ?? []).slice(0, 3).map((item: any, i: number) => <ActivityRow key={i} {...toActivityRow(item, 'receipt')} />)
                       )}
                     </div>
                   </div>
@@ -172,7 +172,7 @@ export default function DashboardPage() {
                       {(data?.recentRedemptions ?? []).length === 0 ? (
                         <p style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '12px' }}>Belum ada penebusan</p>
                       ) : (
-                        (data?.recentRedemptions ?? []).map((item: any, i: number) => <ActivityRow key={i} {...toActivityRow(item, 'redemption')} />)
+                        (data?.recentRedemptions ?? []).slice(0, 3).map((item: any, i: number) => <ActivityRow key={i} {...toActivityRow(item, 'redemption')} />)
                       )}
                     </div>
                   </div>

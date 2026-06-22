@@ -20,6 +20,7 @@ router.get('/receipts/history', controller.getReceiptHistory.bind(controller));
 router.get('/penerimaan/history', controller.getReceiptHistory.bind(controller));
 router.get('/validate-shipment/:kirimanId', controller.validateShipment.bind(controller));
 router.get('/validasi-kiriman/:kirimanId', controller.validateShipment.bind(controller));
+router.get('/kiriman/search', controller.searchKiriman.bind(controller));
 router.post('/receipts', controller.receiveShipment.bind(controller));
 router.post('/terima-stok', controller.receiveShipment.bind(controller));
 

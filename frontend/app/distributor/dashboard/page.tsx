@@ -115,8 +115,8 @@ export default function DashboardDistributorPage() {
     { label: 'Total Stok Keluar',       value: data.stockSummary?.totalOutgoing ?? 0 },
   ] : []
 
-  const aktivitasPengiriman = data?.recentShipments ?? []
-  const stokPupuk = data?.recentStockOut ?? []
+  const aktivitasPengiriman = data?.recentShipments?.slice(0, 3) ?? []
+  const stokPupuk = data?.recentStockOut?.slice(0, 3) ?? []
   const notifikasi = data?.notifications ?? []
 
   if (loading) {

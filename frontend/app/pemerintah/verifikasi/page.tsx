@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import SidebarPemerintah from '@/components/pemerintah/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import { api, ApiError } from '@/lib/api'
-import { CheckCircle, XCircle, ChevronLeft, ChevronRight, ExternalLink, Users, UserCheck, UserX } from 'lucide-react'
+import { CheckCircle, XCircle, ExternalLink, Users, UserCheck, UserX } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface PendingUser {
@@ -24,7 +25,7 @@ interface SummaryData {
   totalRows: number
 }
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 6
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function VerifikasiPage() {
@@ -333,43 +334,7 @@ export default function VerifikasiPage() {
                   <p style={{ fontSize: '13px', color: '#888' }}>
                     Menampilkan {users.length} dari {totalRows} data
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e5e5',
-                        background: page === 1 ? '#f5f5f5' : 'white',
-                        cursor: page === 1 ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        opacity: page === 1 ? 0.5 : 1,
-                      }}
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <span style={{ fontSize: '14px', color: '#333', fontWeight: 600 }}>
-                      {page} / {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e5e5',
-                        background: page === totalPages ? '#f5f5f5' : 'white',
-                        cursor: page === totalPages ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        opacity: page === totalPages ? 0.5 : 1,
-                      }}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
+                  <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
                 </div>
               </>
             )}

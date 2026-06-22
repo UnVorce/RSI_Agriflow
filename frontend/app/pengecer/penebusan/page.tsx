@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { UserCircle, MapPin, CheckCircle2 } from 'lucide-react'
 import Sidebar from '@/components/pengecer/Sidebar'
@@ -19,16 +19,24 @@ const pupukMap: Record<string, number> = {
 
 type Step = 1 | 2 | 3
 
+interface PetaniSearchResult {
+  petaniId: string
+  nama: string
+  alamat: string
+}
+
 export default function PenebusanPupukPage() {
   const [step, setStep]               = useState<Step>(1)
 
-  const [idInput, setIdInput]         = useState('')
+  const [petaniSearch, setPetaniSearch] = useState('')
+  const [showPetaniDropdown, setShowPetaniDropdown] = useState(false)
+  const [petaniList, setPetaniList] = useState<PetaniSearchResult[]>([])
   const [idError, setIdError]         = useState('')
   const [petani, setPetani]           = useState<DataPetani | null>(null)
   const [idKonfirm, setIdKonfirm]     = useState('')
-  const [cekLoading, setCekLoading]   = useState(false)
   const [kirimLoading, setKirimLoading] = useState(false)
   const [kirimError, setKirimError]   = useState('')
+  const petaniRef = useRef<HTMLDivElement>(null)
 
   const [jenis, setJenis]             = useState('')
   const [jenisSearch, setJenisSearch] = useState('')
@@ -39,6 +47,24 @@ export default function PenebusanPupukPage() {
   const [waktuTebus, setWaktuTebus]   = useState('')
   const [status, setStatus]           = useState<'Berhasil' | 'Gagal'>('Berhasil')
 
+  const searchPetani = useCallback(async (q: string) => {
+    try {
+      const res = await api.get<PetaniSearchResult[]>(`/api/petani/search?q=${encodeURIComponent(q)}`)
+      if (res.data) setPetaniList(Array.isArray(res.data) ? res.data : [])
+    } catch { setPetaniList([]) }
+  }, [])
+
+  const petaniTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  function handlePetaniInput(v: string) {
+    setPetaniSearch(v)
+    setPetani(null)
+    setIdKonfirm('')
+    setIdError('')
+    setShowPetaniDropdown(true)
+    if (petaniTimer.current) clearTimeout(petaniTimer.current)
+    petaniTimer.current = setTimeout(() => searchPetani(v), 300)
+  }
+
   const availableJenis = petani
     ? petani.kuotaPupuk.map(k => k.jenis)
     : jenisPupukOptions
@@ -47,14 +73,13 @@ export default function PenebusanPupukPage() {
     j.toLowerCase().includes(jenisSearch.toLowerCase())
   )
 
-  // ── Step 1: cek ID petani ──────────────────────────────────────────────────
-  async function handleCekId() {
-    const id = idInput.trim().toUpperCase()
-    if (!id) { setIdError('Masukkan ID Petani'); return }
-    setCekLoading(true)
+  // ── Step 1: cari & pilih petani ────────────────────────────────────────────
+  async function handlePilihPetani(p: PetaniSearchResult) {
+    setShowPetaniDropdown(false)
+    setPetaniSearch(p.nama)
     setIdError('')
     try {
-      const res = await api.get<{ petaniDetails: any; quotas: KuotaPupuk[] }>(`/api/pengecer/validasi-petani/${id}`)
+      const res = await api.get<{ petaniDetails: any; quotas: KuotaPupuk[] }>(`/api/pengecer/validasi-petani/${p.petaniId}`)
       if (res.data) {
         const pd = res.data.petaniDetails
         const q = (res.data.quotas ?? []).map((q: any) => ({
@@ -62,20 +87,29 @@ export default function PenebusanPupukPage() {
           kuota: q.SisaKuota ?? q.sisaKuota ?? q.kuota ?? 0,
         }))
         setPetani({
-          nama: pd.NamaPetani || pd.namaPetani || pd.nama || id,
-          alamat: pd.AlamatPetani || pd.alamatPetani || pd.alamat || '',
+          nama: pd.NamaPetani || pd.namaPetani || pd.nama || p.nama,
+          alamat: pd.AlamatPetani || pd.alamatPetani || pd.alamat || p.alamat,
           kuotaPupuk: q,
         })
-        setIdKonfirm(id)
+        setIdKonfirm(p.petaniId)
         setJenis(''); setJenisSearch(''); setJumlah('')
         setStep(2)
       }
     } catch (err) {
-      setIdError(err instanceof ApiError ? err.message : 'ID Petani tidak ditemukan')
-    } finally {
-      setCekLoading(false)
+      setIdError(err instanceof ApiError ? err.message : 'Data petani tidak ditemukan')
     }
   }
+
+  useEffect(() => {
+    function outside(e: MouseEvent) {
+      if (petaniRef.current && !petaniRef.current.contains(e.target as Node))
+        setShowPetaniDropdown(false)
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
+        setShowDropdown(false)
+    }
+    document.addEventListener('mousedown', outside)
+    return () => document.removeEventListener('mousedown', outside)
+  }, [])
 
   // ── Step 2: konfirmasi ─────────────────────────────────────────────────────
   async function handleKonfirmasi() {
@@ -106,7 +140,7 @@ export default function PenebusanPupukPage() {
 
   // ── Stepper ────────────────────────────────────────────────────────────────
   const steps = [
-    { n: 1, label: 'ID Penebusan Pupuk' },
+    { n: 1, label: 'Cari Petani' },
     { n: 2, label: 'Detail Penebusan' },
     { n: 3, label: 'Konfirmasi Penebusan' },
   ]
@@ -201,19 +235,24 @@ export default function PenebusanPupukPage() {
               {step === 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '420px' }}>
                   <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '17px', color: '#1a1a1a' }}>
-                    Masukkan ID Petani
+                    Cari Petani
                   </p>
-                  <input
-                    type="text"
-                    value={idInput}
-                    onChange={e => { setIdInput(e.target.value); setIdError('') }}
-                    placeholder="PTN001"
-                    style={inputStyle}
-                    onKeyDown={e => e.key === 'Enter' && handleCekId()}
-                  />
+                  <div ref={petaniRef} style={{ position: 'relative' }}>
+                    <input type="text" value={petaniSearch} onChange={e => handlePetaniInput(e.target.value)} onFocus={() => { searchPetani(petaniSearch); setShowPetaniDropdown(true) }} placeholder="Cari nama petani..." style={{ ...inputStyle, paddingRight: '40px' }} />
+                    <span onClick={() => setShowPetaniDropdown(v => !v)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#1e6b1e', userSelect: 'none' }}>▾</span>
+                    {showPetaniDropdown && petaniList.length > 0 && (
+                      <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: 'white', border: '1.5px solid #c8e0c8', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 50, maxHeight: '200px', overflowY: 'auto' }}>
+                        {petaniList.map((p, i) => (
+                          <div key={p.petaniId} onMouseDown={() => handlePilihPetani(p)} style={{ padding: '11px 16px', fontSize: '14px', color: '#1a1a1a', cursor: 'pointer', background: 'white', borderRadius: i === 0 ? '10px 10px 0 0' : i === petaniList.length - 1 ? '0 0 10px 10px' : '0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background 0.1s' }}>
+                            <span>{p.nama}</span>
+                            <span style={{ fontSize: '12px', color: '#1e6b1e', fontWeight: 600 }}># {p.petaniId}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {idError && <p style={{ fontSize: '13px', color: '#c53030' }}>{idError}</p>}
                   {kirimError && <p style={{ fontSize: '13px', color: '#c53030' }}>{kirimError}</p>}
-                  <button style={{ ...btnPrimary, opacity: cekLoading ? 0.6 : 1 }} disabled={cekLoading} onClick={handleCekId}>{cekLoading ? 'Memeriksa...' : 'CEK ID'}</button>
                 </div>
               )}
 
@@ -308,7 +347,7 @@ export default function PenebusanPupukPage() {
                     {/* Jumlah Pupuk */}
                     <div>
                       <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '15px', marginBottom: '10px', color: '#1a1a1a' }}>
-                        Jumlah Pupuk
+Jumlah Pupuk (Kg)
                       </p>
                       <input
                         type="number"
@@ -380,7 +419,7 @@ export default function PenebusanPupukPage() {
                       Riwayat Transaksi
                     </Link>
                     <button
-                      onClick={() => { setStep(1); setIdInput(''); setPetani(null); setJenis(''); setJumlah('') }}
+                      onClick={() => { setStep(1); setPetaniSearch(''); setPetani(null); setJenis(''); setJumlah('') }}
                       style={{ ...btnOutline, flex: 1, fontSize: '13px' }}
                     >
                       Penebusan Baru

@@ -180,7 +180,7 @@ export default function BantuanPage() {
               <input
                 name="email"
                 type="email"
-                placeholder="aanindya05@gmail.com"
+                placeholder="example@gmail.com"
                 value={form.email}
                 onChange={handleChange}
                 style={inputStyle(errors.email)}

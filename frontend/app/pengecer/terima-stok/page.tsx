@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Calendar } from 'lucide-react'
 import Sidebar from '@/components/pengecer/Sidebar'
@@ -14,16 +14,27 @@ type Step = 1 | 2 | 3
 
 interface RecentReceipt { kirimanId: string; timestampDikirim: string; jenisPupuk: string; jumlahDikirim: number }
 
+interface KirimanSearchResult {
+  kirimanId: string
+  jenisPupuk: string
+  jumlahDikirim: number
+  timestampDikirim: string
+  status: string
+  distributor: string
+}
+
 export default function TerimaStokPage() {
   const [step, setStep]           = useState<Step>(1)
-  const [idInput, setIdInput]     = useState('')
+  const [kirimanSearch, setKirimanSearch] = useState('')
+  const [showKirimanDropdown, setShowKirimanDropdown] = useState(false)
+  const [kirimanList, setKirimanList] = useState<KirimanSearchResult[]>([])
   const [idError, setIdError]     = useState('')
   const [pengiriman, setPengiriman] = useState<{ jenis: string; jumlah: number; waktu: string } | null>(null)
   const [idKonfirm, setIdKonfirm] = useState('')
-  const [cekLoading, setCekLoading] = useState(false)
   const [kirimLoading, setKirimLoading] = useState(false)
   const [kirimError, setKirimError] = useState('')
   const [recentReceipts, setRecentReceipts] = useState<RecentReceipt[]>([])
+  const kirimanRef = useRef<HTMLDivElement>(null)
 
   // Step 2 form
   const [jenis, setJenis]         = useState('')
@@ -34,11 +45,30 @@ export default function TerimaStokPage() {
   const dateInputRef              = useRef<HTMLInputElement>(null)
   const dropdownRef               = useRef<HTMLDivElement>(null)
 
+  const searchKiriman = useCallback(async (q: string) => {
+    try {
+      const res = await api.get<KirimanSearchResult[]>(`/api/pengecer/kiriman/search?q=${encodeURIComponent(q)}`)
+      if (res.data) setKirimanList(Array.isArray(res.data) ? res.data : [])
+    } catch { setKirimanList([]) }
+  }, [])
+
+  const kirimanTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  function handleKirimanInput(v: string) {
+    setKirimanSearch(v)
+    setPengiriman(null)
+    setIdKonfirm('')
+    setIdError('')
+    setShowKirimanDropdown(true)
+    if (kirimanTimer.current) clearTimeout(kirimanTimer.current)
+    kirimanTimer.current = setTimeout(() => searchKiriman(v), 300)
+  }
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (kirimanRef.current && !kirimanRef.current.contains(e.target as Node))
+        setShowKirimanDropdown(false)
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
         setShowDropdown(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -54,39 +84,48 @@ export default function TerimaStokPage() {
     j.toLowerCase().includes(jenisSearch.toLowerCase())
   )
 
-  const [status, setStatus]             = useState<'Sesuai' | 'Tidak Sesuai'>('Sesuai')
+  const [status, setStatus]             = useState<'Diterima' | 'Tidak Sesuai'>('Diterima')
   const [waktuKonfirmasi, setWaktuKonfirmasi] = useState('')
 
-  // ── Step 1: cek ID ──────────────────────────────────────────────────────────
-  async function handleCekId() {
-    const id = idInput.trim()
-    if (!id) { setIdError('Masukkan ID Pengiriman'); return }
-    setCekLoading(true)
+  // ── Step 1: cari pengiriman ────────────────────────────────────────────────
+  function handlePilihKiriman(k: KirimanSearchResult) {
+    const jenisPupuk = k.jenisPupuk || ''
+    setPengiriman({ jenis: jenisPupuk, jumlah: k.jumlahDikirim ?? 0, waktu: k.timestampDikirim || '' })
+    setIdKonfirm(k.kirimanId)
+    setKirimanSearch(`${k.distributor} — ${k.kirimanId}`)
+    setShowKirimanDropdown(false)
     setIdError('')
-    try {
-      const res = await api.get<any>(`/api/pengecer/validasi-kiriman/${id}`)
-      if (res.data) {
-        const d = res.data
-        const jenisPupuk = d.JenisPupuk || d.jenisPupuk || ''
-        setPengiriman({ jenis: jenisPupuk, jumlah: d.JumlahDikirim ?? d.jumlahDikirim ?? 0, waktu: d.TimestampDikirim || d.timestampDikirim || '' })
-        setIdKonfirm(id)
-        setJenis(jenisPupuk); setJenisSearch(''); setJumlah(''); setWaktu('')
-        setStep(2)
-      }
-    } catch (err) {
-      setIdError(err instanceof ApiError ? err.message : 'ID Pengiriman tidak valid')
-    } finally {
-      setCekLoading(false)
-    }
+    setJenis(jenisPupuk); setJenisSearch(''); setJumlah(''); setWaktu('')
+    setStep(2)
   }
 
   // ── Step 2: konfirmasi detail ───────────────────────────────────────────────
   async function handleKonfirmasi() {
     if (!jumlah || !waktu) return
-    setKirimLoading(true)
     setKirimError('')
+
+    // Validasi tanggal
+    const [dd, mm, yyyy] = waktu.split('/')
+    const tglTerima = new Date(+yyyy, +mm - 1, +dd)
+    tglTerima.setHours(0, 0, 0, 0)
+
+    const tglKirim = pengiriman?.waktu ? new Date(pengiriman.waktu) : null
+    if (tglKirim) tglKirim.setHours(0, 0, 0, 0)
+
+    const hariIni = new Date()
+    hariIni.setHours(0, 0, 0, 0)
+
+    if (tglKirim && tglTerima < tglKirim) {
+      setKirimError('Tanggal penerimaan tidak boleh lebih kecil dari tanggal pengiriman')
+      return
+    }
+    if (tglTerima > hariIni) {
+      setKirimError('Tanggal penerimaan tidak boleh lebih dari hari ini')
+      return
+    }
+
+    setKirimLoading(true)
     try {
-      const [dd, mm, yyyy] = waktu.split('/')
       const now = new Date()
       const pad = (n: number) => String(n).padStart(2, '0')
       const timestampDiterima = `${yyyy}-${mm}-${dd}T${pad(now.getHours())}:${pad(now.getMinutes())}:00Z`
@@ -97,7 +136,7 @@ export default function TerimaStokPage() {
         timestampDiterima,
       })
 
-      const statusPenerimaan = res.data?.StatusPenerimaan || 'Sesuai'
+      const statusPenerimaan = res.data?.StatusPenerimaan || 'Diterima'
       const jam = `${pad(now.getHours())}:${pad(now.getMinutes())}`
       setWaktuKonfirmasi(`${waktu} | ${jam}`)
       setStatus(statusPenerimaan)
@@ -111,7 +150,7 @@ export default function TerimaStokPage() {
 
   // ── Stepper indicator ───────────────────────────────────────────────────────
   const steps = [
-    { n: 1, label: 'ID Pengiriman' },
+    { n: 1, label: 'Cari Pengiriman' },
     { n: 2, label: 'Detail Penerimaan' },
     { n: 3, label: 'Simpan Penerimaan' },
   ]
@@ -229,22 +268,28 @@ export default function TerimaStokPage() {
                 {step === 1 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '17px', color: '#1a1a1a' }}>
-                      Masukkan ID Pengiriman
+                      Cari Pengiriman
                     </p>
-                    <input
-                      type="text"
-                      value={idInput}
-                      onChange={e => { setIdInput(e.target.value); setIdError('') }}
-                      placeholder="135246"
-                      style={inputStyle}
-                      onKeyDown={e => e.key === 'Enter' && handleCekId()}
-                    />
+                    <div ref={kirimanRef} style={{ position: 'relative' }}>
+                      <input type="text" value={kirimanSearch} onChange={e => handleKirimanInput(e.target.value)} onFocus={() => { searchKiriman(kirimanSearch); setShowKirimanDropdown(true) }} placeholder="Cari ID pengiriman atau nama distributor..." style={{ ...inputStyle, paddingRight: '40px' }} />
+                      <span onClick={() => setShowKirimanDropdown(v => !v)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#1e6b1e', userSelect: 'none' }}>▾</span>
+                      {showKirimanDropdown && kirimanList.length > 0 && (
+                        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: 'white', border: '1.5px solid #c8e0c8', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 50, maxHeight: '200px', overflowY: 'auto' }}>
+                          {kirimanList.map((k, i) => (
+                            <div key={k.kirimanId} onMouseDown={() => handlePilihKiriman(k)} style={{ padding: '11px 16px', fontSize: '14px', color: '#1a1a1a', cursor: 'pointer', background: 'white', borderRadius: i === 0 ? '10px 10px 0 0' : i === kirimanList.length - 1 ? '0 0 10px 10px' : '0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background 0.1s' }}>
+                              <div>
+                                <span style={{ fontWeight: 600 }}>{k.distributor}</span>
+                                <span style={{ fontSize: '12px', color: '#888', marginLeft: '6px' }}>#{k.kirimanId}</span>
+                              </div>
+                              <span style={{ fontSize: '12px', color: '#1e6b1e', fontWeight: 600 }}>{k.jenisPupuk}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     {idError && (
                       <p style={{ fontSize: '13px', color: '#c53030' }}>{idError}</p>
                     )}
-                    <button style={{ ...btnPrimary, opacity: cekLoading ? 0.6 : 1 }} disabled={cekLoading} onClick={handleCekId}>
-                      {cekLoading ? 'Memeriksa...' : 'CEK ID'}
-                    </button>
                   </div>
                 )}
 
@@ -268,7 +313,7 @@ export default function TerimaStokPage() {
                     {/* Jumlah Pupuk */}
                     <div>
                       <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', marginBottom: '10px', color: '#1a1a1a' }}>
-                        Jumlah Pupuk
+                        Jumlah Pupuk (Kg)
                       </p>
                       <input
                         type="number"
@@ -381,7 +426,7 @@ export default function TerimaStokPage() {
                         <span style={{
                           fontFamily: 'var(--font-display)',
                           fontWeight: 700, fontSize: '14px',
-                          color: label === 'Status Penerimaan' ? (status === 'Sesuai' ? '#1e6b1e' : '#c53030') : '#1a1a1a',
+                          color: label === 'Status Penerimaan' ? (status === 'Diterima' ? '#1e6b1e' : '#c53030') : '#1a1a1a',
                         }}>{val}</span>
                       </div>
                     ))}
