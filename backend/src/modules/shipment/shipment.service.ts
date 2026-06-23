@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
 import { Decimal } from '@prisma/client/runtime/library';
+import { isBeforeDate } from '../../utils/date.util';
 
 function esc(val: string | null | undefined): string {
   if (val == null) return 'NULL';
@@ -181,7 +182,8 @@ export class ShipmentService {
   async receiveShipment(
     kirimanId: number,
     retailerId: number,
-    jumlahDiterima: number
+    jumlahDiterima: number,
+    timestampDiterima?: Date
   ) {
     if (jumlahDiterima <= 0) {
       throw new AppError('Jumlah diterima harus lebih dari 0', 400);
@@ -206,6 +208,11 @@ export class ShipmentService {
       throw new AppError('Kiriman sudah diproses', 400);
     }
 
+    const finalTimestampDiterima = timestampDiterima || new Date();
+    if (shipment.TimestampDikirim && isBeforeDate(finalTimestampDiterima, shipment.TimestampDikirim)) {
+      throw new AppError('Tanggal diterima tidak boleh lebih awal dari tanggal pengiriman', 400);
+    }
+
     const status = shipment.JumlahDikirim.equals(jumlahDiterima)
       ? 'Diterima'
       : 'Tidak Sesuai';
@@ -216,7 +223,7 @@ export class ShipmentService {
         data: {
           JumlahDiterima: jumlahDiterima,
           Status: status,
-          TimestampDiterima: new Date(),
+          TimestampDiterima: timestampDiterima || new Date(),
         },
         include: {
           Pupuk: true,

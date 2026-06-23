@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { DistributorService } from './distributor.service';
+import { parseInputDate, isFutureDate } from '../../utils/date.util';
 
 const service = new DistributorService();
 
@@ -33,12 +34,17 @@ export class DistributorController {
       const numPupukId = Number(pupukId);
       if (isNaN(numPupukId)) return res.status(400).json({ success: false, message: 'pupukId tidak valid' });
 
+      const parsedTimestamp = parseInputDate(timestamp);
+      if (isFutureDate(parsedTimestamp)) {
+        return res.status(400).json({ success: false, message: 'Tanggal tidak boleh lebih dari tanggal sekarang' });
+      }
+
       const data = await service.createShipment({
         distributorId: userId,
         pengecerId: numPengecerId,
         pupukId: numPupukId,
         jumlah,
-        timestamp: timestamp ? new Date(timestamp) : undefined,
+        timestamp: parsedTimestamp,
       });
 
       res.status(201).json({ success: true, data });
@@ -72,6 +78,20 @@ export class DistributorController {
       if (isNaN(userId)) return res.status(401).json({ success: false, message: 'Unauthorized' });
       const pageNumber = parseInt(req.query.page as string) || 1;
       const data = await service.getShipmentHistory(userId, pageNumber);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/distributor/pengecer/search
+   * Search pengecer by name
+   */
+  async searchPengecer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const q = (req.query.q as string || '').trim();
+      const data = await service.searchPengecer(q);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -137,11 +157,16 @@ export class DistributorController {
       const numPupukId = Number(pupukId);
       if (isNaN(numPupukId)) return res.status(400).json({ success: false, message: 'pupukId tidak valid' });
 
+      const parsedWaktu = parseInputDate(waktu);
+      if (isFutureDate(parsedWaktu)) {
+        return res.status(400).json({ success: false, message: 'Tanggal tidak boleh lebih dari tanggal sekarang' });
+      }
+
       const data = await service.adjustStock({
         userId,
         pupukId: numPupukId,
         jumlahPenyesuaian,
-        waktu: waktu ? new Date(waktu) : undefined,
+        waktu: parsedWaktu,
       });
 
       res.json({ success: true, data });
@@ -162,11 +187,16 @@ export class DistributorController {
       const numPupukId = Number(pupukId);
       if (isNaN(numPupukId)) return res.status(400).json({ success: false, message: 'pupukId tidak valid' });
 
+      const parsedWaktu = parseInputDate(waktu);
+      if (isFutureDate(parsedWaktu)) {
+        return res.status(400).json({ success: false, message: 'Tanggal tidak boleh lebih dari tanggal sekarang' });
+      }
+
       const data = await service.addStock({
         userId,
         pupukId: numPupukId,
         jumlahMasuk,
-        waktu: waktu ? new Date(waktu) : undefined,
+        waktu: parsedWaktu,
       });
 
       res.json({ success: true, data });

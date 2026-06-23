@@ -78,13 +78,15 @@ export default function Sidebar() {
     <aside
       style={{
         width: '240px',
-        minHeight: '100vh',
+        height: '100vh',
         background: '#114111',
         display: 'flex',
         flexDirection: 'column',
         padding: '0',
         flexShrink: 0,
-        position: 'relative',
+        position: 'sticky',
+        top: 0,
+        overflow: 'hidden',
       }}
     >
       {/* Logo */}
@@ -121,7 +123,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav Items */}
-      <nav style={{ flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <nav style={{ flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
         {navItems.map(({ label, href, icon: Icon }) => (
           <Link key={href} href={href} style={linkStyle(href)}>
             <Icon size={20} strokeWidth={1.8} />

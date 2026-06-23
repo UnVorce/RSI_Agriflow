@@ -58,6 +58,7 @@ router.post('/', petaniController.createFarmer);
  *     security:
  *       - bearerAuth: []
  */
+router.get('/search', petaniController.searchFarmers);
 router.get('/:petaniId', petaniController.getFarmerById);
 
 /**

@@ -142,7 +142,7 @@ export default function RegisterPage() {
               />
               <input
                 type="email"
-                placeholder="aanindya05@gmail.com"
+                placeholder="example@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={inputWithIconStyle}

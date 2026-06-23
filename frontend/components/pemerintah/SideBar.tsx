@@ -11,16 +11,18 @@ import {
   Bell,
   HelpCircle,
   LogOut,
+  Users,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
 
 const navItems = [
-  { label: 'Dashboard',          href: '/pemerintah/dashboard',  icon: Home },
-  { label: 'Verifikasi Pendaftar', href: '/pemerintah/verifikasi', icon: UserCheck },
-  { label: 'Notifikasi',         href: '/pemerintah/notifikasi', icon: Bell },
-  { label: 'Deteksi Anomali',    href: '/pemerintah/anomali',    icon: AlertTriangle },
-  { label: 'Bantuan & Keluhan',  href: '/pemerintah/bantuan',    icon: HelpCircle },
+  { label: 'Dashboard',            href: '/pemerintah/dashboard',       icon: Home },
+  { label: 'Verifikasi Pendaftar', href: '/pemerintah/verifikasi',      icon: UserCheck },
+  { label: 'User Management',      href: '/pemerintah/user-management', icon: Users },
+  { label: 'Notifikasi',           href: '/pemerintah/notifikasi',      icon: Bell },
+  { label: 'Deteksi Anomali',      href: '/pemerintah/anomali',         icon: AlertTriangle },
+  { label: 'Bantuan & Keluhan',    href: '/pemerintah/bantuan',         icon: HelpCircle },
 ]
 
 export default function SidebarPemerintah() {
@@ -76,13 +78,15 @@ export default function SidebarPemerintah() {
     <aside
       style={{
         width: '240px',
-        minHeight: '100vh',
+        height: '100vh',
         background: '#114111',
         display: 'flex',
         flexDirection: 'column',
         padding: '0',
         flexShrink: 0,
-        position: 'relative',
+        position: 'sticky',
+        top: 0,
+        overflow: 'hidden',
       }}
     >
       {/* Logo */}
@@ -93,7 +97,7 @@ export default function SidebarPemerintah() {
       </div>
 
       {/* Nav Items */}
-      <nav style={{ flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <nav style={{ flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
         {navItems.map(({ label, href, icon: Icon }) => (
           <Link key={href} href={href} style={linkStyle(href)}>
             <Icon size={20} strokeWidth={1.8} />

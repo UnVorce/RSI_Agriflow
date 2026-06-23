@@ -6,6 +6,7 @@ import SidebarPemerintah from '@/components/pemerintah/SideBar'
 import TopBar from '@/components/layout/TopBar'
 import Gauge from '@/components/ui/Gauge'
 import LineChart from '@/components/ui/LineChart'
+import FilledMultiLineChart from '@/components/ui/FilledMultiLineChart'
 import HorizontalBar from '@/components/ui/HorizontalBar'
 import { api } from '@/lib/api'
 import { AlertTriangle, MapPin, Layers, TrendingUp, Leaf } from 'lucide-react'
@@ -28,6 +29,13 @@ interface TopSektor {
   totalPupuk: number
 }
 
+interface StockTimeSeriesPoint {
+  tanggalMulai: string
+  distributorKg: number
+  pengecerKg: number
+  petaniKg: number
+}
+
 interface DashboardData {
   petaProvinsi: ProvinsiData[]
   totalTerserapTon: string
@@ -35,6 +43,7 @@ interface DashboardData {
   top3Provinsi: ProvinsiData[]
   trenBulanan: TrenBulanan[]
   top3Sektor: TopSektor[]
+  stockTimeSeries?: StockTimeSeriesPoint[]
 }
 
 interface Notification {
@@ -57,9 +66,10 @@ export default function DashboardPemerintahPage() {
   useEffect(() => {
     Promise.allSettled([
       api.get<any>('/api/pemerintah/dashboard'),
+      api.get<any>('/api/pemerintah/stock-time-series?weeks=52'),
       api.get<any>('/api/pemerintah/notifications/top'),
     ])
-      .then(([dashRes, notifRes]) => {
+      .then(([dashRes, stockRes, notifRes]) => {
         if (dashRes.status === 'fulfilled' && dashRes.value.data) {
           const raw = dashRes.value.data
           const absorbedRow = Array.isArray(raw.totalAbsorbed) ? raw.totalAbsorbed[0] : raw.totalAbsorbed
@@ -91,6 +101,16 @@ export default function DashboardPemerintahPage() {
           }
           setData(normalized)
           setError('')
+        }
+        if (stockRes.status === 'fulfilled' && stockRes.value.data) {
+          const raw = stockRes.value.data
+          const series: StockTimeSeriesPoint[] = (raw.series ?? []).map((s: any) => ({
+            tanggalMulai: s.tanggalMulai ?? s.TanggalMulai ?? '',
+            distributorKg: Number(s.distributorKg ?? s.DistributorKg ?? 0),
+            pengecerKg: Number(s.pengecerKg ?? s.PengecerKg ?? 0),
+            petaniKg: Number(s.petaniKg ?? s.PetaniKg ?? 0),
+          }))
+          setData(prev => prev ? { ...prev, stockTimeSeries: series } : null)
         }
         if (notifRes.status === 'fulfilled' && notifRes.value.data) {
           const raw = notifRes.value.data
@@ -226,6 +246,15 @@ export default function DashboardPemerintahPage() {
                 <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '15px', color: '#1a1a1a' }}>Tren Penyerapan Bulanan</h2>
               </div>
               <LineChart data={data?.trenBulanan ?? []} />
+            </div>
+
+            {/* Stock Time Series Chart */}
+            <div style={{ background: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #eee', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
+                <Layers size={16} color='#1e6b1e' />
+                <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '15px', color: '#1a1a1a' }}>Tren Stok Pupuk (Distributor, Pengecer, Petani)</h2>
+              </div>
+              <FilledMultiLineChart data={data?.stockTimeSeries ?? []} />
             </div>
 
           </main>

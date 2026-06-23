@@ -5,6 +5,9 @@ import { AuthProvider } from '@/context/AuthContext'
 export const metadata: Metadata = {
   title: 'AgriFlow — Sistem Penyaluran Pupuk Subsidi',
   description: 'Platform penyaluran pupuk subsidi yang transparan dan tepat sasaran.',
+  icons: {
+    icon: '/icon.png',
+  },
 }
 
 export default function RootLayout({

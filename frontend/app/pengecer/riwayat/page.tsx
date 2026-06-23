@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import Sidebar from '@/components/pengecer/Sidebar'
 import TopBar from '@/components/layout/TopBar'
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
+import { Search, SlidersHorizontal, Calendar, X } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 import { api } from '@/lib/api'
 import { formatStock } from '@/lib/format'
 
@@ -114,7 +115,7 @@ export default function RiwayatPage() {
         { label: 'Jumlah Penebusan', value: formatStock(summaryNya.totalPenebusan ?? 0) },
       ]
 
-  const pageSize = 10
+  const pageSize = 5
   const totalPages = Math.ceil(filtered.length / pageSize)
   const displayed = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
@@ -360,75 +361,106 @@ export default function RiwayatPage() {
 
           {/* Table */}
           {(() => {
-            const headers = tab === 'penerimaan'
-              ? ['ID Pengiriman', 'Jenis Pupuk', 'Jumlah Pupuk', 'Tanggal Penerimaan', 'Status']
-              : ['ID Penebusan',  'Jenis Pupuk', 'Jumlah Pupuk', 'Tanggal Penebusan',  'Status']
-            return (
-          <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #eee', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '14px 24px', borderBottom: '1px solid #f0f0f0' }}>
-              {headers.map(h => (
-                <span key={h} style={{ fontSize: '14px', color: '#888', fontWeight: 500, textAlign: 'center' }}>{h}</span>
-              ))}
-            </div>
-
-            {loading ? (
-              <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Memuat...</div>
-            ) : error ? (
-              <div style={{ padding: '48px', textAlign: 'center', color: '#c53030', fontSize: '14px' }}>{error}</div>
-            ) : filtered.length === 0 ? (
-              <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>
-                Tidak ada data yang cocok.
-              </div>
-            ) : (
-              displayed.map((row, i) => {
-                const idStr = row.KirimanId || row.kirimanId || row.PenebusanId || row.penebusanId || row.tebusanId || '-'
-                const jenisNya = row.JenisPupuk || row.jenisPupuk || '-'
-                const jumlahNya = row.JumlahDikirim ?? row.jumlahDikirim ?? row.Jumlah ?? row.jumlah ?? 0
-                const timestampStr = row.TimestampDikirim || row.timestampDikirim || row.TimestampPenebusan || row.timestampPenebusan || ''
-                const tanggalNya = timestampStr ? new Date(timestampStr).toLocaleDateString('id-ID') : '-'
-                const statusNya = getStatus(row, tab)
-                const statusBg = statusNya === 'Dikirim' ? '#eab308'
-                  : statusNya === 'Tidak Sesuai' ? '#dc2626'
-                  : '#16a34a'
-
-                return (
-                  <div key={`${idStr}-${i}`} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 160px 200px 160px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
-                    <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{idStr.slice(0, 8)}</span>
-                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{jenisNya}</span>
-                    <span style={{ fontSize: '15px', color: '#333', textAlign: 'center' }}>{formatStock(jumlahNya)}</span>
-                    <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{tanggalNya}</span>
-                    <div style={{ textAlign: 'center' }}>
-                      <span style={{
-                        padding: '5px 0', borderRadius: '999px', display: 'inline-block', width: '120px', textAlign: 'center',
-                        background: statusBg,
-                        color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px',
-                      }}>
-                        {statusNya}
-                      </span>
-                    </div>
+            if (tab === 'penerimaan') {
+              return (
+                <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #eee', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '120px 1.2fr 1.2fr 120px 120px 140px 140px 130px', padding: '14px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                    {['ID Kiriman', 'Distributor', 'Jenis Pupuk', 'Dikirim', 'Diterima', 'Tgl Kirim', 'Tgl Terima', 'Status'].map(h => (
+                      <span key={h} style={{ fontSize: '13px', color: '#888', fontWeight: 600, textAlign: 'center' }}>{h}</span>
+                    ))}
                   </div>
-                )
-              })
-            )}
-          </div>
-          )})()}
+
+                  {loading ? (
+                    <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Memuat...</div>
+                  ) : error ? (
+                    <div style={{ padding: '48px', textAlign: 'center', color: '#c53030', fontSize: '14px' }}>{error}</div>
+                  ) : filtered.length === 0 ? (
+                    <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Tidak ada data yang cocok.</div>
+                  ) : (
+                    displayed.map((row, i) => {
+                      const idStr = row.KirimanId || row.kirimanId || '-'
+                      const jenisNya = row.JenisPupuk || row.jenisPupuk || '-'
+                      const jumlahDikirim = row.JumlahDikirim ?? row.jumlahDikirim ?? 0
+                      const jumlahDiterima = (row as any).jumlahDiterima ?? null
+                      const tsKirim = row.TimestampDikirim || row.timestampDikirim || ''
+                      const tsTerima = (row as any).timestampDiterima || ''
+                      const statusNya = getStatus(row, tab)
+                      const statusBg = statusNya === 'Dikirim' ? '#eab308' : statusNya === 'Tidak Sesuai' ? '#dc2626' : '#16a34a'
+
+                      return (
+                        <div key={`${idStr}-${i}`} style={{ display: 'grid', gridTemplateColumns: '120px 1.2fr 1.2fr 120px 120px 140px 140px 130px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
+                          <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{idStr.slice(0, 8)}</span>
+                          <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{(row as any).distributor || '-'}</span>
+                          <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{jenisNya}</span>
+                          <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{formatStock(jumlahDikirim)}</span>
+                          <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{jumlahDiterima != null ? formatStock(jumlahDiterima) : '-'}</span>
+                          <span style={{ fontSize: '13px', color: '#555', textAlign: 'center' }}>{tsKirim ? new Date(tsKirim).toLocaleDateString('id-ID') : '-'}</span>
+                          <span style={{ fontSize: '13px', color: '#555', textAlign: 'center' }}>{tsTerima ? new Date(tsTerima).toLocaleDateString('id-ID') : '-'}</span>
+                          <div style={{ textAlign: 'center' }}>
+                            <span style={{ padding: '5px 0', borderRadius: '999px', display: 'inline-block', width: '100px', textAlign: 'center', background: statusBg, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '12px' }}>
+                              {statusNya}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )
+            } else {
+              return (
+                <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #eee', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '160px 1.5fr 1.5fr 160px 160px 160px', padding: '14px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                    {['ID Penebusan', 'Petani', 'Jenis Pupuk', 'Jumlah', 'Tgl Penebusan', 'Status'].map(h => (
+                      <span key={h} style={{ fontSize: '13px', color: '#888', fontWeight: 600, textAlign: 'center' }}>{h}</span>
+                    ))}
+                  </div>
+
+                  {loading ? (
+                    <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Memuat...</div>
+                  ) : error ? (
+                    <div style={{ padding: '48px', textAlign: 'center', color: '#c53030', fontSize: '14px' }}>{error}</div>
+                  ) : filtered.length === 0 ? (
+                    <div style={{ padding: '48px', textAlign: 'center', color: '#aaa', fontSize: '14px' }}>Tidak ada data yang cocok.</div>
+                  ) : (
+                    displayed.map((row, i) => {
+                      const idStr = row.PenebusanId || row.penebusanId || row.tebusanId || '-'
+                      const jenisNya = row.JenisPupuk || row.jenisPupuk || '-'
+                      const jumlahNya = row.Jumlah ?? row.jumlah ?? 0
+                      const tsTebus = row.TimestampPenebusan || row.timestampPenebusan || ''
+                      const statusNya = getStatus(row, tab)
+                      const statusBg = statusNya === 'Dikirim' ? '#eab308' : statusNya === 'Tidak Sesuai' ? '#dc2626' : '#16a34a'
+                      const petaniRaw = (row as any).Petani ?? (row as any).petani ?? null
+                      const petaniNama = typeof petaniRaw === 'string'
+                        ? petaniRaw
+                        : petaniRaw
+                          ? [petaniRaw.FirstName, petaniRaw.MiddleName, petaniRaw.LastName].filter(Boolean).join(' ')
+                          : '-'
+
+                      return (
+                        <div key={`${idStr}-${i}`} style={{ display: 'grid', gridTemplateColumns: '160px 1.5fr 1.5fr 160px 160px 160px', padding: '16px 24px', background: i % 2 === 0 ? '#fafafa' : 'white', alignItems: 'center' }}>
+                          <span style={{ fontSize: '14px', color: '#555', textAlign: 'center' }}>{idStr.slice(0, 8)}</span>
+                          <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{petaniNama}</span>
+                          <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{jenisNya}</span>
+                          <span style={{ fontSize: '14px', color: '#333', textAlign: 'center' }}>{formatStock(jumlahNya)}</span>
+                          <span style={{ fontSize: '13px', color: '#555', textAlign: 'center' }}>{tsTebus ? new Date(tsTebus).toLocaleDateString('id-ID') : '-'}</span>
+                          <div style={{ textAlign: 'center' }}>
+                            <span style={{ padding: '5px 0', borderRadius: '999px', display: 'inline-block', width: '100px', textAlign: 'center', background: statusBg, color: 'white', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '12px' }}>
+                              {statusNya}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )
+            }
+          })()}
 
           {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px', marginTop: '20px' }}>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ChevronLeft size={14} />
-            </button>
-            {Array.from({length: totalPages}, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setCurrentPage(p)}
-                style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid', borderColor: currentPage === p ? '#1e6b1e' : '#ddd', background: currentPage === p ? '#1e6b1e' : 'white', color: currentPage === p ? 'white' : '#333', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
-                {p}
-              </button>
-            ))}
-            <button onClick={() => setCurrentPage(p => p + 1)}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ChevronRight size={14} />
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
 
         </main>

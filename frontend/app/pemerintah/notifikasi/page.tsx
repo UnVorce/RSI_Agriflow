@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import SidebarPemerintah from '@/components/pemerintah/SideBar'
 import TopBar from '@/components/layout/TopBar'
-import { ChevronLeft, ChevronRight, X, AlertTriangle, Bell } from 'lucide-react'
+import { X, AlertTriangle, Bell } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 import { api } from '@/lib/api'
 
 interface NotifikasiItem {
@@ -127,31 +128,8 @@ export default function NotifikasiPemerintahPage() {
           </div>
 
           {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px', marginTop: '24px' }}>
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: currentPage === 1 ? 0.5 : 1 }}
-            >
-              <ChevronLeft size={14} />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button
-                key={p} onClick={() => setCurrentPage(p)}
-                style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid', borderColor: currentPage === p ? '#1e6b1e' : '#ddd', background: currentPage === p ? '#1e6b1e' : 'white', color: currentPage === p ? 'white' : '#333', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
-              >
-                {p}
-              </button>
-            ))}
-
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #ddd', background: 'white', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: currentPage === totalPages ? 0.5 : 1 }}
-            >
-              <ChevronRight size={14} />
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
 
           {/* Modal Detail */}

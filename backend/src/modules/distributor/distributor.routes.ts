@@ -21,6 +21,7 @@ router.get('/shipments/history', controller.getShipmentHistory.bind(controller))
 router.get('/pengiriman/history', controller.getShipmentHistory.bind(controller));
 router.get('/validate-pengecer/:pengecerId', controller.validatePengecer.bind(controller));
 router.get('/validasi-pengecer/:pengecerId', controller.validatePengecer.bind(controller));
+router.get('/pengecer/search', controller.searchPengecer.bind(controller));
 
 // Stock Management
 router.get('/stock', controller.getStockDashboard.bind(controller));

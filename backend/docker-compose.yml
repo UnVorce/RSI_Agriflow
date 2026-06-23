@@ -5,14 +5,4 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
-
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: agriflow-sqlserver
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "AgriFlow123!"
-      MSSQL_PID: "Developer"
-    ports:
-      - "1433:1433"
-    restart: unless-stopped
+  

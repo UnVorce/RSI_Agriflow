@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../common/middleware/error.middleware';
+import { isBeforeDate } from '../../utils/date.util';
 
 function esc(val: string | null | undefined): string {
   if (val == null) return 'NULL';
@@ -130,6 +131,48 @@ export class PengecerService {
   }
 
   /**
+   * GET /api/pengecer/kiriman/search
+   * Search incoming shipments by ID or distributor name
+   */
+  async searchKiriman(userId: number, query: string) {
+    try {
+      const result = await prisma.$queryRaw<any[]>`
+        SELECT
+          k.KirimanId,
+          k.JumlahDikirim,
+          k.TimestampDikirim,
+          k.Status,
+          p.JenisPupuk,
+          u.FirstName AS distFirstName,
+          u.MiddleName AS distMiddleName,
+          u.LastName AS distLastName
+        FROM trans.KIRIMAN_PUPUK k
+        JOIN master.PUPUK p ON k.PupukId = p.PupukId
+        JOIN [master].[USER] u ON k.UserIdDistributor = u.UserId
+        WHERE k.UserIdPengecer = ${userId}
+          AND (
+            CAST(k.KirimanId AS NVARCHAR(20)) LIKE ${`%${query}%`}
+            OR u.FirstName LIKE ${`%${query}%`}
+            OR u.MiddleName LIKE ${`%${query}%`}
+            OR u.LastName LIKE ${`%${query}%`}
+          )
+        ORDER BY k.TimestampDikirim DESC
+      `;
+
+      return (result || []).map(r => ({
+        kirimanId: String(r.KirimanId ?? ''),
+        jenisPupuk: r.JenisPupuk || '',
+        jumlahDikirim: Number(r.JumlahDikirim ?? 0),
+        timestampDikirim: r.TimestampDikirim || null,
+        status: r.Status || '',
+        distributor: [r.distFirstName, r.distMiddleName, r.distLastName].filter(Boolean).join(' '),
+      }));
+    } catch (error: any) {
+      throw new AppError('Gagal mencari pengiriman', 500);
+    }
+  }
+
+  /**
    * Receive shipment from distributor
    */
   async receiveShipment(data: {
@@ -149,7 +192,7 @@ export class PengecerService {
     const result = await prisma.$transaction(async (tx: any) => {
       // 1. Get shipment data with pupuk info
       const [shipment] = await tx.$queryRaw<any[]>`
-        SELECT k.KirimanId, k.PupukId, k.UserIdDistributor, k.JumlahDikirim, p.JenisPupuk
+        SELECT k.KirimanId, k.PupukId, k.UserIdDistributor, k.JumlahDikirim, k.TimestampDikirim, p.JenisPupuk
         FROM trans.KIRIMAN_PUPUK k
         JOIN master.PUPUK p ON k.PupukId = p.PupukId
         WHERE k.KirimanId = ${data.kirimanId} AND k.UserIdPengecer = ${data.pengecerId}
@@ -157,6 +200,15 @@ export class PengecerService {
 
       if (!shipment) {
         throw new AppError('Pengiriman tidak ditemukan', 400);
+      }
+
+      if (shipment.Status && shipment.Status !== 'Dikirim') {
+        throw new AppError('Pengiriman sudah diterima sebelumnya', 400);
+      }
+
+      const finalTimestampDiterima = data.timestampDiterima || new Date();
+      if (shipment.TimestampDikirim && isBeforeDate(finalTimestampDiterima, shipment.TimestampDikirim)) {
+        throw new AppError('Tanggal diterima tidak boleh lebih awal dari tanggal pengiriman', 400);
       }
 
       // 2. Determine status
@@ -234,23 +286,25 @@ export class PengecerService {
       const pesanDistributor = `Kiriman #${data.kirimanId} (${shipment.JenisPupuk}) ${statusNotif} oleh ${namaPengecer}. Dikirim: ${Number(shipment.JumlahDikirim).toFixed(2)} kg, Diterima: ${Number(data.jumlahDiterima).toFixed(2)} kg`;
       const truncatedDistributor = pesanDistributor.slice(0, maxLen);
 
-      // Insert notification for pengecer
-      const [notifIdPengecer] = await tx.$queryRaw<any[]>`
-        SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
-      `;
-      await tx.$executeRawUnsafe(`
-        INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
-        VALUES (${Number(notifIdPengecer.nextId)}, 'PENERIMAAN', 'Penerimaan Stok', ${esc(truncatedPengecer)}, 0, ${data.pengecerId}, GETDATE())
-      `);
+      // Insert notification for pengecer (only for mismatch)
+      if (status === 'Tidak Sesuai') {
+        const [notifIdPengecer] = await tx.$queryRaw<any[]>`
+          SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
+        `;
+        await tx.$executeRawUnsafe(`
+          INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+          VALUES (${Number(notifIdPengecer.nextId)}, 'KETIDAKSESUAIAN', 'Penerimaan Tidak Sesuai', ${esc(truncatedPengecer)}, 0, ${data.pengecerId}, GETDATE())
+        `);
 
-      // Insert notification for distributor
-      const [notifIdDistributor] = await tx.$queryRaw<any[]>`
-        SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
-      `;
-      await tx.$executeRawUnsafe(`
-        INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
-        VALUES (${Number(notifIdDistributor.nextId)}, 'PENERIMAAN', 'Penerimaan Stok', ${esc(truncatedDistributor)}, 0, ${shipment.UserIdDistributor}, GETDATE())
-      `);
+        // Insert notification for distributor
+        const [notifIdDistributor] = await tx.$queryRaw<any[]>`
+          SELECT ISNULL(MAX(NotifikasiId), 0) + 1 AS nextId FROM evt.NOTIFIKASI WITH (TABLOCKX)
+        `;
+        await tx.$executeRawUnsafe(`
+          INSERT INTO evt.NOTIFIKASI (NotifikasiId, Jenis, Judul, Pesan, StatusDibaca, UserId, Timestamp)
+          VALUES (${Number(notifIdDistributor.nextId)}, 'KETIDAKSESUAIAN', 'Penerimaan Tidak Sesuai', ${esc(truncatedDistributor)}, 0, ${shipment.UserIdDistributor}, GETDATE())
+        `);
+      }
 
       // 8. Insert LOG_AKTIVITAS
       await tx.$executeRawUnsafe(`
@@ -372,9 +426,13 @@ export class PengecerService {
           k.JumlahDiterima AS jumlahDiterima,
           k.TimestampDikirim AS timestampDikirim,
           k.TimestampDiterima AS timestampDiterima,
-          k.Status AS status
+          k.Status AS status,
+          u.FirstName AS distributorNamaDepan,
+          u.MiddleName AS distributorNamaTengah,
+          u.LastName AS distributorNamaBelakang
         FROM trans.KIRIMAN_PUPUK k
         JOIN master.PUPUK p ON k.PupukId = p.PupukId
+        JOIN [master].[USER] u ON k.UserIdDistributor = u.UserId
         WHERE k.UserIdPengecer = ${userId}
         ORDER BY k.TimestampDikirim DESC
       `,
@@ -394,6 +452,7 @@ export class PengecerService {
         timestampDikirim: r.timestampDikirim || null,
         timestampDiterima: r.timestampDiterima || null,
         status: r.status || '',
+        distributor: [r.distributorNamaDepan, r.distributorNamaTengah, r.distributorNamaBelakang].filter(Boolean).join(' ') || '',
       })),
     };
   }

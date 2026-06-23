@@ -27,6 +27,33 @@ interface CreateFarmerInput {
 }
 
 export class PetaniService {
+  async searchFarmers(userIdPengecer: number, query: string) {
+    const farmers = await prisma.petani.findMany({
+      where: {
+        UserIdPengecer: userIdPengecer,
+        OR: [
+          { FirstName: { contains: query } },
+          { MiddleName: { contains: query } },
+          { LastName: { contains: query } },
+        ],
+      },
+      select: {
+        PetaniId: true,
+        FirstName: true,
+        MiddleName: true,
+        LastName: true,
+        Jalan: true,
+      },
+      take: 20,
+    });
+
+    return farmers.map(f => ({
+      petaniId: f.PetaniId,
+      nama: [f.FirstName, f.MiddleName, f.LastName].filter(Boolean).join(' '),
+      alamat: f.Jalan || '',
+    }));
+  }
+
   async getFarmersByRetailer(
     userIdPengecer: number,
     params: GetFarmersParams
